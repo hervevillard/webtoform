@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WebToForm — AI Insurance Form Generator</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">&#128196; WebToForm</div>
+    <div class="tagline">AI-Powered Insurance Form Generator</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- Upload card -->
+  <div class="card">
+    <h2>Generate a Fillable Customer Form</h2>
+    <p>Upload an insurance document (policy, intake sheet, etc.) and the AI will extract the required fields and produce a fillable PDF you can send to your customers.</p>
+
+    <div id="drop-zone">
+      <span class="icon">&#128196;</span>
+      <div class="drop-label">Drag &amp; drop your PDF here</div>
+      <div class="drop-sub">or click to browse</div>
+      <input type="file" id="file-input" accept=".pdf" />
+    </div>
+
+    <div id="file-name"></div>
+
+    <button class="btn btn-primary" id="analyze-btn" disabled>
+      &#9889; Analyze &amp; Generate Form
+    </button>
+
+    <div id="status-area"></div>
+  </div>
+
+  <!-- Results card -->
+  <div class="card" id="result-card">
+    <h2>&#10003; Form Ready</h2>
+    <p>Your fillable PDF has been generated. Preview the detected fields below, then download the form to send to your customer.</p>
+
+    <div class="field-count">
+      <strong id="field-count-text"></strong>
+    </div>
+
+    <ul id="field-list"></ul>
+
+    <button class="btn btn-success" id="download-btn">
+      &#8595; Download Fillable PDF
+    </button>
+  </div>
+
+</main>
+
+<footer>
+  WebToForm &mdash; Powered by DeepSeek AI &nbsp;|&nbsp; For insurance professional use
+</footer>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

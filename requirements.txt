@@ -1,0 +1,7 @@
+flask>=3.0
+werkzeug>=3.0
+python-dotenv>=1.0
+openai>=1.30          # used for DeepSeek's OpenAI-compatible API
+PyMuPDF>=1.24         # PDF text extraction (fitz)
+reportlab>=4.2        # PDF generation
+pypdf>=4.0            # Optional: PDF inspection / merging

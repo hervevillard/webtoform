@@ -4,94 +4,132 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>WebToForm — AI Insurance Form Generator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="/static/css/style.css" />
 </head>
 <body>
 
+<!-- ── Header ─────────────────────────────────────────────── -->
 <header>
-  <div>
-    <div class="logo">&#128196; WebToForm</div>
+  <div class="header-left">
+    <div class="logo">&#9670; WebToForm</div>
     <div class="tagline">AI-Powered Insurance Form Generator</div>
+  </div>
+  <div class="header-right">
+    <!-- API key status dot + settings button -->
+    <div id="key-indicator" class="key-indicator" title="API Key settings">
+      <span id="key-dot" class="key-dot key-dot--checking"></span>
+      <span id="key-indicator-label">API Key</span>
+    </div>
+    <button class="header-settings-btn" id="settings-btn" title="Configure API key">
+      &#9881;
+    </button>
   </div>
 </header>
 
-<main>
-
-  <!-- API key banner (shown when key is missing) -->
-  <div id="key-banner" class="key-banner" style="display:none;">
-    <span class="key-banner-icon">&#9888;</span>
-    <span>No DeepSeek API key configured. Enter your key below before analyzing a document.</span>
-  </div>
-
-  <!-- API key settings card -->
-  <div class="card" id="key-card">
-    <div class="key-header" id="key-toggle">
+<!-- ── Settings drawer (slide-down) ──────────────────────── -->
+<div id="settings-drawer" class="settings-drawer" style="display:none;">
+  <div class="settings-inner">
+    <div class="settings-header">
       <span id="key-status-icon" class="key-icon">&#128273;</span>
       <div>
-        <h2 style="margin-bottom:0;">DeepSeek API Key</h2>
-        <p style="margin-bottom:0;" id="key-status-text">Checking…</p>
+        <div class="settings-title">DeepSeek API Key</div>
+        <p class="settings-sub" id="key-status-text">Checking…</p>
       </div>
-      <span class="key-chevron" id="key-chevron">&#8964;</span>
+      <button class="settings-close" id="settings-close" title="Close">&#10005;</button>
     </div>
 
-    <div id="key-form" style="display:none; margin-top:1.2rem;">
+    <div id="key-form">
       <label class="key-label" for="api-key-input">Paste your API key</label>
       <div class="key-input-row">
         <input type="password" id="api-key-input" class="key-input"
                placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
-        <button class="btn btn-primary" id="key-toggle-vis" type="button" title="Show/hide key">&#128065;</button>
+        <button class="btn btn-ghost" id="key-toggle-vis" type="button" title="Show / hide">&#128065;</button>
       </div>
       <p class="key-hint">
-        Get a free key at
+        Free key at
         <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">platform.deepseek.com</a>.
-        The key is saved to your local <code>.env</code> file and never leaves your PC.
+        Saved to your local <code>.env</code> — never leaves your PC.
       </p>
-      <button class="btn btn-primary" id="save-key-btn" style="margin-top:.5rem;">&#10003; Save Key</button>
-      <span id="key-save-status" style="margin-left:.8rem; font-size:.85rem;"></span>
+      <div style="display:flex; align-items:center; gap:.9rem; margin-top:.9rem;">
+        <button class="btn btn-primary" id="save-key-btn">&#10003;&nbsp; Save Key</button>
+        <span id="key-save-status" style="font-size:.83rem;"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── API key missing banner (main area) ─────────────────── -->
+<div id="key-banner" class="key-banner" style="display:none;">
+  <span class="key-banner-icon">&#9888;&#65039;</span>
+  <span>No DeepSeek API key — click the <strong>&#9881;</strong> settings icon in the top-right to add one.</span>
+</div>
+
+<!-- ── Main ───────────────────────────────────────────────── -->
+<main>
+
+  <!-- Step indicator -->
+  <div class="steps" id="step-indicator">
+    <div class="step active" id="step-1">
+      <div class="step-num">1</div>
+      <span class="step-label">Upload PDF</span>
+    </div>
+    <div class="step" id="step-2">
+      <div class="step-num">2</div>
+      <span class="step-label">AI Analysis</span>
+    </div>
+    <div class="step" id="step-3">
+      <div class="step-num">3</div>
+      <span class="step-label">Download Form</span>
     </div>
   </div>
 
-  <!-- Upload card -->
+  <!-- ── Upload card ───────────────────────────────────────── -->
   <div class="card">
-    <h2>Generate a Fillable Customer Form</h2>
-    <p>Upload an insurance document (policy, intake sheet, etc.) and the AI will extract the required fields and produce a fillable PDF you can send to your customers.</p>
+    <div class="card-title"><span class="icon">&#128196;</span> Generate a Fillable Customer Form</div>
+    <p class="card-desc">Upload any insurance document — policy, intake sheet, coverage summary — and AI will identify the fields your customer needs to fill in, then produce a ready-to-send PDF form.</p>
 
     <div id="drop-zone">
-      <span class="icon">&#128196;</span>
-      <div class="drop-label">Drag &amp; drop your PDF here</div>
-      <div class="drop-sub">or click to browse</div>
+      <span class="dz-icon">&#128196;</span>
+      <div class="dz-label">Drag &amp; drop your PDF here</div>
+      <div class="dz-sub">or click to browse &nbsp;·&nbsp; max 16 MB</div>
       <input type="file" id="file-input" accept=".pdf" />
     </div>
 
     <div id="file-name"></div>
 
     <button class="btn btn-primary" id="analyze-btn" disabled>
-      &#9889; Analyze &amp; Generate Form
+      &#9889;&nbsp; Analyze &amp; Generate Form
     </button>
 
     <div id="status-area"></div>
   </div>
 
-  <!-- Results card -->
+  <!-- ── Results card ──────────────────────────────────────── -->
   <div class="card" id="result-card">
-    <h2>&#10003; Form Ready</h2>
-    <p>Your fillable PDF has been generated. Preview the detected fields below, then download the form to send to your customer.</p>
+    <div class="card-title"><span class="icon">&#10003;</span> Form Ready to Download</div>
+    <p class="card-desc">Preview the detected fields below, then download the fillable PDF to send to your customer.</p>
 
-    <div class="field-count">
+    <div class="field-summary">
+      <span>&#128203;</span>
       <strong id="field-count-text"></strong>
     </div>
 
     <ul id="field-list"></ul>
 
     <button class="btn btn-success" id="download-btn">
-      &#8595; Download Fillable PDF
+      &#8595;&nbsp; Download Fillable PDF
     </button>
   </div>
 
 </main>
 
+<!-- ── Footer ─────────────────────────────────────────────── -->
 <footer>
-  WebToForm &mdash; Powered by DeepSeek AI &nbsp;|&nbsp; For insurance professional use
+  WebToForm &nbsp;&mdash;&nbsp; Powered by <span>DeepSeek AI</span>
+  &nbsp;&nbsp;|&nbsp;&nbsp; For insurance professional use
+  &nbsp;&nbsp;|&nbsp;&nbsp; Built by <span>Herve</span>
 </footer>
 
 <script src="/static/js/app.js"></script>

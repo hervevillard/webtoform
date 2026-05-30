@@ -1,7 +1,27 @@
 {
   "permissions": {
     "allow": [
-      "Skill(deep-research)"
+      "Skill(deep-research)",
+      "Workflow(deep-research)",
+      "WebSearch",
+      "WebFetch(domain:stephaniewalter.design)",
+      "WebFetch(domain:ilovehue.co)",
+      "WebFetch(domain:developerux.com)",
+      "WebFetch(domain:skyryedesign.com)",
+      "WebFetch(domain:designsystem.digital.gov)",
+      "WebFetch(domain:itbeesolution.com)",
+      "WebFetch(domain:webflow.com)",
+      "WebFetch(domain:designpickle.com)",
+      "WebFetch(domain:tentackles.com)",
+      "WebFetch(domain:www.kalungi.com)",
+      "WebFetch(domain:www.acscreative.com)",
+      "WebFetch(domain:www.color-hex.com)",
+      "WebFetch(domain:www.schemecolor.com)",
+      "WebFetch(domain:clothescolorguide.com)",
+      "WebFetch(domain:lachycouture.com)",
+      "WebFetch(domain:www.kentecloth.net)",
+      "WebFetch(domain:sankofaedition.com)",
+      "WebFetch(domain:www.figma.com)"
     ]
   }
 }

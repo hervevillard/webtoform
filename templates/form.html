@@ -130,6 +130,22 @@
       flex-shrink: 0;
       text-align: right;
     }
+    .wf-add-item-btn {
+      margin-top: .4rem;
+      padding: .32rem .8rem;
+      font-size: .78rem;
+      font-family: inherit;
+      font-weight: 600;
+      border: 1.5px solid var(--gold);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--gold);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .wf-add-item-btn:hover { background: var(--gold); color: var(--midnight); }
+    .wf-list-details-label { margin-top: .75rem; font-size: .72rem; opacity: .75; }
+    .wf-list-details { min-height: 70px; }
 
     /* Submit button */
     .wf-submit-wrap { margin-top: 1.8rem; border-top: 1px solid var(--border); padding-top: 1.5rem; }
@@ -288,17 +304,26 @@
             </label>
 
           {% elif ftype == 'list' %}
-            <div class="wf-list-rows">
-              {% for i in range(1, 6) %}
+            <div class="wf-list-rows" id="list-rows-{{ loop.index }}">
+              {% set prefill_list = prefill_val if prefill_val else [] %}
+              {% set initial_count = [prefill_list|length, 3]|max %}
+              {% for i in range(1, initial_count + 1) %}
               <div class="wf-list-row">
                 <span class="wf-list-num">#{{ i }}</span>
                 <input type="text" name="{{ label }}_{{ i }}"
                        class="wf-input"
                        placeholder="Entry #{{ i }}…"
-                       value="{{ (prefill_val or [])[i-1] if prefill_val and prefill_val|length >= i else '' }}" />
+                       value="{{ prefill_list[i-1] if prefill_list|length >= i else '' }}" />
               </div>
               {% endfor %}
             </div>
+            <button type="button" class="wf-add-item-btn"
+                    data-list-id="list-rows-{{ loop.index }}"
+                    data-field-name="{{ label }}">&#43;&nbsp; Add Item</button>
+            <label class="wf-label wf-list-details-label">Additional details (optional)</label>
+            <textarea name="{{ label }}_details"
+                      class="wf-textarea wf-list-details"
+                      placeholder="Any extra context or details…"></textarea>
 
           {% else %}
             <!-- text, and any unknown type -->
@@ -326,14 +351,31 @@
 
 </div>
 <script>
-  // Default all empty date inputs to today
   (function () {
+    // Default all empty date inputs to today
     const today = new Date();
     const iso = today.getFullYear() + '-' +
       String(today.getMonth() + 1).padStart(2, '0') + '-' +
       String(today.getDate()).padStart(2, '0');
     document.querySelectorAll('input[type="date"]').forEach(function (el) {
       if (!el.value) el.value = iso;
+    });
+
+    // Dynamic "+ Add Item" for list fields
+    document.querySelectorAll('.wf-add-item-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var rows = document.getElementById(btn.dataset.listId);
+        var count = rows.querySelectorAll('.wf-list-row').length + 1;
+        var fieldName = btn.dataset.fieldName;
+        var row = document.createElement('div');
+        row.className = 'wf-list-row';
+        row.innerHTML =
+          '<span class="wf-list-num">#' + count + '</span>' +
+          '<input type="text" name="' + fieldName + '_' + count +
+          '" class="wf-input" placeholder="Entry #' + count + '…" />';
+        rows.appendChild(row);
+        row.querySelector('input').focus();
+      });
     });
   })();
 </script>

@@ -211,8 +211,13 @@ def submit_form(form_id: str):
         if ftype == "checkbox":
             submission_data[label] = "Yes" if request.form.get(label) else "No"
         elif ftype == "list":
-            rows = [request.form.get(f"{label}_{i}", "").strip() for i in range(1, 6)]
-            submission_data[label] = [r for r in rows if r]
+            prefix = f"{label}_"
+            numbered = sorted(
+                ((int(k[len(prefix):]), v) for k, v in request.form.items()
+                 if k.startswith(prefix) and k[len(prefix):].isdigit()),
+                key=lambda t: t[0]
+            )
+            submission_data[label] = [v.strip() for _, v in numbered if v.strip()]
         else:
             submission_data[label] = request.form.get(label, "").strip()
 

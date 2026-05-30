@@ -4,6 +4,7 @@ Fields are real PDF form widgets — clickable and fillable in any PDF viewer.
 'list' type renders ADD_ROWS_COUNT pre-labelled rows so the customer can fill multiple entries.
 """
 import os
+from datetime import date as _date
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib import colors
 from reportlab.lib.units import inch
@@ -30,7 +31,7 @@ GAP_LABEL       = 0.14 * inch             # space between label and top of field
 ROW_LABEL_GAP   = 0.08 * inch
 
 # For 'list' fields — how many blank rows to pre-render
-ADD_ROWS_COUNT  = 5
+ADD_ROWS_COUNT  = 3
 
 # Colours
 COL_HEADER_BG   = colors.HexColor("#1C1C2E")   # deep midnight
@@ -137,7 +138,7 @@ class PageManager:
 # ── Field renderers ─────────────────────────────────────────────────────────
 
 def _render_text(pm: PageManager, label: str, required: bool,
-                 field_name: str, multiline: bool = False):
+                 field_name: str, multiline: bool = False, default_value: str = ""):
     fh = TEXTAREA_H if multiline else TEXT_H
     needed = GAP_LABEL + fh + GAP_AFTER_FIELD + LABEL_SIZE / 72 * inch
     pm.ensure(needed)
@@ -160,6 +161,8 @@ def _render_text(pm: PageManager, label: str, required: bool,
     )
     if multiline:
         kwargs["fieldFlags"] = "multiline"
+    if default_value:
+        kwargs["value"] = default_value
     pm.c.acroForm.textfield(**kwargs)
     pm.y = field_y - GAP_AFTER_FIELD
 
@@ -197,7 +200,7 @@ def _render_list(pm: PageManager, label: str, required: bool,
     pm.ensure(min(needed, (PAGE_H - 1.3 * inch - MARGIN_Y_BOTTOM) * 0.85))
 
     label_y = pm.y - LABEL_SIZE / 72 * inch
-    _draw_label(pm.c, MARGIN_X, label_y, label + (f" (add up to {row_count})" + (" *" if required else "")), False)
+    _draw_label(pm.c, MARGIN_X, label_y, label + (" *" if required else ""), False)
 
     # Gold underline for the section header
     pm.c.setStrokeColor(colors.HexColor("#C9A84C"))
@@ -233,7 +236,27 @@ def _render_list(pm: PageManager, label: str, required: bool,
         )
         pm.y = field_y - GAP_AFTER_FIELD * 0.6
 
-    pm.y -= GAP_AFTER_FIELD * 0.8
+    # "Additional details" textarea below the rows
+    details_label_y = pm.y - LABEL_SIZE / 72 * inch * 0.9
+    pm.c.setFillColor(colors.HexColor("#8B6914"))
+    pm.c.setFont(HINT_FONT, 7.5)
+    pm.c.drawString(MARGIN_X, details_label_y, "Additional details (optional)")
+    pm.ensure(TEXTAREA_H + GAP_LABEL + GAP_AFTER_FIELD)
+    field_y = details_label_y - GAP_LABEL - TEXTAREA_H
+    pm.c.acroForm.textfield(
+        name=f"{field_name}_details",
+        tooltip=f"{field_name} — additional details",
+        x=MARGIN_X, y=field_y,
+        width=FIELD_W, height=TEXTAREA_H,
+        borderColor=COL_FIELD_BORD,
+        fillColor=COL_FIELD_BG,
+        textColor=colors.HexColor("#1C1C2E"),
+        borderWidth=0.75,
+        fontSize=BODY_SIZE,
+        fontName=BODY_FONT,
+        fieldFlags="multiline",
+    )
+    pm.y = field_y - GAP_AFTER_FIELD * 1.2
 
 
 # ── Public API ──────────────────────────────────────────────────────────────
@@ -256,8 +279,10 @@ def create_fillable_pdf(fields: list[dict], output_path: str,
 
     pm = PageManager(c, title)
 
+    today_str = _date.today().strftime("%m / %d / %Y")
+
     hint_map = {
-        "date":  " (MM / DD / YYYY)",
+        "date":  f" (MM / DD / YYYY)",
         "email": " (email address)",
         "phone": " (phone number)",
     }
@@ -275,8 +300,11 @@ def create_fillable_pdf(fields: list[dict], output_path: str,
             _render_text(pm, display, required, fname, multiline=True)
         elif ftype == "list":
             _render_list(pm, display, required, fname)
+        elif ftype == "date":
+            _render_text(pm, display, required, fname, multiline=False,
+                         default_value=today_str)
         else:
-            # text, date, email, phone all use a single-line textfield
+            # text, email, phone all use a single-line textfield
             _render_text(pm, display, required, fname, multiline=False)
 
     # Required field legend

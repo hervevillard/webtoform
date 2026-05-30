@@ -17,18 +17,15 @@
     <div class="tagline">AI-Powered Insurance Form Generator</div>
   </div>
   <div class="header-right">
-    <!-- API key status dot + settings button -->
     <div id="key-indicator" class="key-indicator" title="API Key settings">
       <span id="key-dot" class="key-dot key-dot--checking"></span>
       <span id="key-indicator-label">API Key</span>
     </div>
-    <button class="header-settings-btn" id="settings-btn" title="Configure API key">
-      &#9881;
-    </button>
+    <button class="header-settings-btn" id="settings-btn" title="Configure API key">&#9881;</button>
   </div>
 </header>
 
-<!-- ── Settings drawer (slide-down) ──────────────────────── -->
+<!-- ── Settings drawer ────────────────────────────────────── -->
 <div id="settings-drawer" class="settings-drawer" style="display:none;">
   <div class="settings-inner">
     <div class="settings-header">
@@ -39,7 +36,6 @@
       </div>
       <button class="settings-close" id="settings-close" title="Close">&#10005;</button>
     </div>
-
     <div id="key-form">
       <label class="key-label" for="api-key-input">Paste your API key</label>
       <div class="key-input-row">
@@ -60,68 +56,195 @@
   </div>
 </div>
 
-<!-- ── API key missing banner (main area) ─────────────────── -->
+<!-- ── API key missing banner ─────────────────────────────── -->
 <div id="key-banner" class="key-banner" style="display:none;">
   <span class="key-banner-icon">&#9888;&#65039;</span>
   <span>No DeepSeek API key — click the <strong>&#9881;</strong> settings icon in the top-right to add one.</span>
 </div>
 
+<!-- ── Tab bar ────────────────────────────────────────────── -->
+<div class="tab-bar">
+  <button class="tab-btn active" data-tab="ai">&#9889; AI Generate</button>
+  <button class="tab-btn" data-tab="manual">&#9998; Manual Builder</button>
+  <button class="tab-btn" data-tab="share">&#128279; Share Form</button>
+  <button class="tab-btn" data-tab="responses">&#128203; Responses</button>
+</div>
+
 <!-- ── Main ───────────────────────────────────────────────── -->
 <main>
 
-  <!-- Step indicator -->
-  <div class="steps" id="step-indicator">
-    <div class="step active" id="step-1">
-      <div class="step-num">1</div>
-      <span class="step-label">Upload PDF</span>
-    </div>
-    <div class="step" id="step-2">
-      <div class="step-num">2</div>
-      <span class="step-label">AI Analysis</span>
-    </div>
-    <div class="step" id="step-3">
-      <div class="step-num">3</div>
-      <span class="step-label">Download Form</span>
-    </div>
-  </div>
+  <!-- ════════════════════════════════════════════════════
+       TAB: AI Generate
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-ai" class="tab-panel active">
 
-  <!-- ── Upload card ───────────────────────────────────────── -->
-  <div class="card">
-    <div class="card-title"><span class="icon">&#128196;</span> Generate a Fillable Customer Form</div>
-    <p class="card-desc">Upload any insurance document — policy, intake sheet, coverage summary — and AI will identify the fields your customer needs to fill in, then produce a ready-to-send PDF form.</p>
-
-    <div id="drop-zone">
-      <span class="dz-icon">&#128196;</span>
-      <div class="dz-label">Drag &amp; drop your PDF here</div>
-      <div class="dz-sub">or click to browse &nbsp;·&nbsp; max 16 MB</div>
-      <input type="file" id="file-input" accept=".pdf" />
+    <!-- Step indicator -->
+    <div class="steps" id="step-indicator">
+      <div class="step active" id="step-1">
+        <div class="step-num">1</div>
+        <span class="step-label">Upload PDF</span>
+      </div>
+      <div class="step" id="step-2">
+        <div class="step-num">2</div>
+        <span class="step-label">AI Analysis</span>
+      </div>
+      <div class="step" id="step-3">
+        <div class="step-num">3</div>
+        <span class="step-label">Download Form</span>
+      </div>
     </div>
 
-    <div id="file-name"></div>
+    <!-- Upload card -->
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128196;</span> Generate a Fillable Customer Form</div>
+      <p class="card-desc">Upload any insurance document — policy, intake sheet, coverage summary — and AI will identify the fields your customer needs to fill in, then produce a ready-to-send PDF form.</p>
 
-    <button class="btn btn-primary" id="analyze-btn" disabled>
-      &#9889;&nbsp; Analyze &amp; Generate Form
-    </button>
+      <div id="drop-zone">
+        <span class="dz-icon">&#128196;</span>
+        <div class="dz-label">Drag &amp; drop your PDF here</div>
+        <div class="dz-sub">or click to browse &nbsp;·&nbsp; max 16 MB</div>
+        <input type="file" id="file-input" accept=".pdf" />
+      </div>
 
-    <div id="status-area"></div>
-  </div>
+      <div id="file-name"></div>
 
-  <!-- ── Results card ──────────────────────────────────────── -->
-  <div class="card" id="result-card">
-    <div class="card-title"><span class="icon">&#10003;</span> Form Ready to Download</div>
-    <p class="card-desc">Preview the detected fields below, then download the fillable PDF to send to your customer.</p>
+      <button class="btn btn-primary" id="analyze-btn" disabled>
+        &#9889;&nbsp; Analyze &amp; Generate Form
+      </button>
 
-    <div class="field-summary">
-      <span>&#128203;</span>
-      <strong id="field-count-text"></strong>
+      <div id="status-area"></div>
     </div>
 
-    <ul id="field-list"></ul>
+    <!-- AI Results card -->
+    <div class="card" id="result-card">
+      <div class="card-title"><span class="icon">&#10003;</span> Fields Detected — Review &amp; Download</div>
+      <p class="card-desc">AI found these fields. Add, edit, or remove any fields before generating your fillable PDF.</p>
+      <div class="field-summary"><span>&#128203;</span><strong id="field-count-text"></strong></div>
+      <ul id="field-list"></ul>
+      <div class="builder-empty" id="ai-builder-empty" style="display:none;">
+        No fields — click <strong>+ Add Field</strong> to add one.
+      </div>
+      <div class="builder-actions" style="margin-top:.8rem;">
+        <button class="btn btn-ghost" id="ai-add-field-btn">&#43;&nbsp; Add Field</button>
+        <button class="btn btn-success" id="download-btn">&#8595;&nbsp; Generate &amp; Download PDF</button>
+      </div>
+      <div id="ai-build-status"></div>
+    </div>
 
-    <button class="btn btn-success" id="download-btn">
-      &#8595;&nbsp; Download Fillable PDF
-    </button>
-  </div>
+  </div><!-- /tab-ai -->
+
+  <!-- ════════════════════════════════════════════════════
+       TAB: Manual Builder
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-manual" class="tab-panel">
+
+    <div class="card">
+      <div class="card-title"><span class="icon">&#9998;</span> Build a Custom Fillable Form</div>
+      <p class="card-desc">Add fields one by one, set the type and whether they're required, then generate your fillable PDF instantly — no AI needed.</p>
+
+      <!-- Form title -->
+      <label class="builder-section-label" for="build-title">Form Title</label>
+      <input type="text" id="build-title" class="builder-title-input"
+             placeholder="e.g. Auto Insurance Intake Form" />
+
+      <!-- Field list -->
+      <div class="builder-header">
+        <span class="builder-section-label" style="margin:0;">Fields</span>
+        <span class="builder-count" id="builder-count">0 fields</span>
+      </div>
+
+      <ul id="builder-list"></ul>
+
+      <div class="builder-empty" id="builder-empty">
+        No fields yet — click <strong>+ Add Field</strong> below to start.
+      </div>
+
+      <div class="builder-actions">
+        <button class="btn btn-ghost" id="add-field-btn">&#43;&nbsp; Add Field</button>
+        <button class="btn btn-primary" id="build-generate-btn">
+          &#128196;&nbsp; Generate Fillable PDF
+        </button>
+      </div>
+
+      <div id="build-status-area"></div>
+    </div>
+
+    <!-- Builder result card -->
+    <div class="card" id="build-result-card">
+      <div class="card-title"><span class="icon">&#10003;</span> Form Ready to Download</div>
+      <p class="card-desc">Your custom fillable PDF has been generated.</p>
+      <div class="field-summary"><span>&#128203;</span><strong id="build-field-count-text"></strong></div>
+      <button class="btn btn-success" id="build-download-btn">&#8595;&nbsp; Download Fillable PDF</button>
+    </div>
+
+  </div><!-- /tab-manual -->
+
+  <!-- ════════════════════════════════════════════════════
+       TAB: Share Form
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-share" class="tab-panel">
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128279;</span> Create a Shareable Web Form</div>
+      <p class="card-desc">Build a web form your customer fills in their browser — with a real calendar date picker. Share the link over email, SMS, or messaging. No PDF viewer needed.</p>
+
+      <label class="builder-section-label" for="share-title">Form Title</label>
+      <input type="text" id="share-title" class="builder-title-input"
+             placeholder="e.g. Home Insurance Intake Form" />
+
+      <div class="builder-header">
+        <span class="builder-section-label" style="margin:0;">Fields</span>
+        <span class="builder-count" id="share-builder-count">0 fields</span>
+      </div>
+
+      <ul id="share-builder-list"></ul>
+      <div class="builder-empty" id="share-builder-empty">
+        No fields yet — click <strong>+ Add Field</strong> below to start.
+      </div>
+
+      <div class="builder-actions">
+        <button class="btn btn-ghost" id="share-add-field-btn">&#43;&nbsp; Add Field</button>
+        <button class="btn btn-primary" id="share-generate-btn">
+          &#128279;&nbsp; Get Share Link
+        </button>
+      </div>
+
+      <div id="share-status-area"></div>
+
+      <!-- Share URL result box -->
+      <div id="share-url-result" style="display:none; margin-top:1.1rem;">
+        <label class="builder-section-label">Share this link with your customer</label>
+        <div class="share-url-row">
+          <input type="text" id="share-url-box" class="share-url-box" readonly />
+          <button class="btn btn-ghost copy-btn" id="copy-url-btn" title="Copy to clipboard">&#128203;</button>
+        </div>
+        <p class="key-hint" style="margin-top:.5rem;">
+          Customer opens this in any browser on the same network — date fields show a calendar picker automatically.
+        </p>
+      </div>
+    </div>
+  </div><!-- /tab-share -->
+
+  <!-- ════════════════════════════════════════════════════
+       TAB: Responses
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-responses" class="tab-panel">
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128203;</span> Customer Responses</div>
+      <p class="card-desc">All submitted forms from your customers. Click a form to expand its submissions.</p>
+
+      <div style="display:flex; justify-content:flex-end; margin-bottom:.9rem;">
+        <button class="btn btn-ghost" id="refresh-responses-btn" style="font-size:.82rem; padding:.4rem 1rem;">
+          &#8635;&nbsp; Refresh
+        </button>
+      </div>
+
+      <div id="responses-list"></div>
+      <div id="responses-empty" class="response-empty" style="display:none;">
+        No shared forms yet. Go to <strong>Share Form</strong> to create one.
+      </div>
+      <div id="responses-loading" class="response-empty">Loading…</div>
+    </div>
+  </div><!-- /tab-responses -->
 
 </main>
 

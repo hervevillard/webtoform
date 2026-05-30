@@ -129,6 +129,11 @@ After any of the following, update the relevant section of `CLAUDE.md` before cl
 | GET | `/download/<filename>` | Serve generated PDF |
 | GET | `/api-key-status` | Returns `{key_set: bool}` |
 | POST | `/set-api-key` | Accepts `{api_key}`, sets env + persists to `.env` |
+| POST | `/build` | Accepts `{title, fields}` JSON, generates PDF without AI, returns same shape as `/upload` |
+| POST | `/share` | Accepts `{title, fields}`, stores form in `data/forms.json`, returns `{form_id, share_url, field_count}` |
+| GET | `/form/<id>` | Renders customer-facing web form (`templates/form.html`) |
+| POST | `/form/<id>/submit` | Saves customer submission to `data/forms.json`, shows thank-you page |
+| GET | `/responses` | Returns JSON list of all forms + submissions (agent only) |
 
 ### PDF form field types
 | Type | Rendered as |

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% if form %}{{ form.title }}{% else %}Form{% endif %} — WebToForm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    /* ── Customer form page overrides ── */
+    body { background: var(--bg); }
+
+    .wf-page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+    }
+
+    .wf-brand {
+      font-size: .75rem;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .wf-brand-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--gold);
+    }
+
+    .wf-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-card);
+      border: 1px solid var(--border);
+      width: 100%;
+      max-width: 580px;
+      overflow: hidden;
+      position: relative;
+    }
+    .wf-card::before {
+      content: '';
+      display: block;
+      height: 4px;
+      background: linear-gradient(90deg, var(--gold), var(--terracotta), var(--forest));
+    }
+
+    .wf-header {
+      background: var(--midnight);
+      padding: 1.4rem 2rem 1.2rem;
+    }
+    .wf-title {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--gold-light);
+      margin-bottom: .3rem;
+    }
+    .wf-subtitle {
+      font-size: .78rem;
+      color: var(--sand);
+      opacity: .8;
+    }
+
+    .wf-body { padding: 1.8rem 2rem; }
+
+    /* Field groups */
+    .wf-field { margin-bottom: 1.3rem; }
+    .wf-label {
+      display: block;
+      font-size: .8rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      letter-spacing: .03em;
+      margin-bottom: .4rem;
+      text-transform: uppercase;
+    }
+    .wf-required { color: var(--red); margin-left: 2px; }
+
+    .wf-input,
+    .wf-textarea,
+    .wf-select {
+      width: 100%;
+      padding: .62rem .85rem;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: .93rem;
+      font-family: inherit;
+      background: var(--ivory-dark);
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color .18s, box-shadow .18s;
+    }
+    .wf-input:focus,
+    .wf-textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,168,76,.18); }
+    .wf-input[type="date"] { color-scheme: light; }
+    .wf-textarea { min-height: 90px; resize: vertical; }
+
+    /* Checkbox field */
+    .wf-checkbox-wrap {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      cursor: pointer;
+    }
+    .wf-checkbox-wrap input[type="checkbox"] {
+      width: 18px; height: 18px;
+      accent-color: var(--gold);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .wf-checkbox-text { font-size: .92rem; color: var(--text-primary); }
+
+    /* List field rows */
+    .wf-list-rows { display: flex; flex-direction: column; gap: .45rem; }
+    .wf-list-row {
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+    }
+    .wf-list-num {
+      font-size: .72rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      width: 18px;
+      flex-shrink: 0;
+      text-align: right;
+    }
+
+    /* Submit button */
+    .wf-submit-wrap { margin-top: 1.8rem; border-top: 1px solid var(--border); padding-top: 1.5rem; }
+    .wf-submit {
+      width: 100%;
+      padding: .85rem;
+      font-size: 1rem;
+      font-weight: 700;
+      font-family: inherit;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--forest), var(--forest-light));
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(45,90,61,.3);
+      transition: all .2s;
+    }
+    .wf-submit:hover { background: linear-gradient(135deg, var(--forest-light), var(--forest)); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(45,90,61,.4); }
+
+    /* Validation error */
+    .wf-validation-error {
+      background: #FEF0EE;
+      border: 1.5px solid #F5B8B0;
+      border-radius: var(--radius-sm);
+      padding: .65rem 1rem;
+      color: var(--red);
+      font-size: .88rem;
+      font-weight: 600;
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+
+    /* Thank-you state */
+    .wf-thankyou {
+      text-align: center;
+      padding: 2.5rem 1rem;
+    }
+    .wf-thankyou-icon { font-size: 3.5rem; margin-bottom: .8rem; }
+    .wf-thankyou h2 { font-size: 1.4rem; font-weight: 800; color: var(--forest); margin-bottom: .5rem; }
+    .wf-thankyou p  { font-size: .9rem; color: var(--text-muted); }
+
+    /* Error state (form not found) */
+    .wf-error {
+      text-align: center;
+      padding: 2.5rem 1rem;
+    }
+    .wf-error-icon { font-size: 3rem; margin-bottom: .8rem; }
+    .wf-error h2 { font-size: 1.2rem; font-weight: 700; color: var(--red); margin-bottom: .5rem; }
+    .wf-error p  { font-size: .88rem; color: var(--text-muted); }
+
+    .wf-footer {
+      margin-top: 1.2rem;
+      font-size: .72rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    .wf-footer span { color: var(--gold); font-weight: 600; }
+
+    @media (max-width: 480px) {
+      .wf-body { padding: 1.3rem 1.1rem; }
+      .wf-header { padding: 1.1rem 1.1rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="wf-page">
+
+  <div class="wf-brand">
+    <div class="wf-brand-dot"></div>
+    WebToForm &nbsp;&mdash;&nbsp; Secure Customer Form
+  </div>
+
+  <div class="wf-card">
+
+    {% if error and not form %}
+    <!-- Form not found -->
+    <div class="wf-body">
+      <div class="wf-error">
+        <div class="wf-error-icon">&#128683;</div>
+        <h2>Form Not Found</h2>
+        <p>{{ error }}</p>
+      </div>
+    </div>
+
+    {% elif submitted %}
+    <!-- Thank you screen -->
+    <div class="wf-header">
+      <div class="wf-title">{{ form.title }}</div>
+    </div>
+    <div class="wf-body">
+      <div class="wf-thankyou">
+        <div class="wf-thankyou-icon">&#10003;&#65039;</div>
+        <h2>Thank you!</h2>
+        <p>Your information has been submitted successfully.<br>Your insurance agent will be in touch shortly.</p>
+      </div>
+    </div>
+
+    {% else %}
+    <!-- The form -->
+    <div class="wf-header">
+      <div class="wf-title">{{ form.title }}</div>
+      <div class="wf-subtitle">Please complete all required fields (*) and click Submit.</div>
+    </div>
+
+    <div class="wf-body">
+
+      {% if validation_error %}
+      <div class="wf-validation-error">&#9888; {{ validation_error }}</div>
+      {% endif %}
+
+      <form method="POST" action="/form/{{ form.id }}/submit" novalidate>
+
+        {% for field in form.fields %}
+        {% set label = field.label %}
+        {% set ftype = field.type %}
+        {% set req   = field.required %}
+        {% set prefill_val = (prefill or {})[label] if prefill else '' %}
+
+        <div class="wf-field">
+          <label class="wf-label" for="f_{{ loop.index }}">
+            {{ label }}{% if req %}<span class="wf-required"> *</span>{% endif %}
+          </label>
+
+          {% if ftype == 'textarea' %}
+            <textarea id="f_{{ loop.index }}" name="{{ label }}"
+                      class="wf-textarea"
+                      {% if req %}required{% endif %}>{{ prefill_val }}</textarea>
+
+          {% elif ftype == 'date' %}
+            <input id="f_{{ loop.index }}" name="{{ label }}" type="date"
+                   class="wf-input"
+                   value="{{ prefill_val }}"
+                   {% if req %}required{% endif %} />
+
+          {% elif ftype == 'email' %}
+            <input id="f_{{ loop.index }}" name="{{ label }}" type="email"
+                   class="wf-input"
+                   placeholder="you@example.com"
+                   value="{{ prefill_val }}"
+                   {% if req %}required{% endif %} />
+
+          {% elif ftype == 'phone' %}
+            <input id="f_{{ loop.index }}" name="{{ label }}" type="tel"
+                   class="wf-input"
+                   placeholder="+1 (555) 000-0000"
+                   value="{{ prefill_val }}"
+                   {% if req %}required{% endif %} />
+
+          {% elif ftype == 'checkbox' %}
+            <label class="wf-checkbox-wrap">
+              <input type="checkbox" name="{{ label }}"
+                     {% if prefill_val == 'Yes' %}checked{% endif %} />
+              <span class="wf-checkbox-text">{{ label }}</span>
+            </label>
+
+          {% elif ftype == 'list' %}
+            <div class="wf-list-rows">
+              {% for i in range(1, 6) %}
+              <div class="wf-list-row">
+                <span class="wf-list-num">#{{ i }}</span>
+                <input type="text" name="{{ label }}_{{ i }}"
+                       class="wf-input"
+                       placeholder="Entry #{{ i }}…"
+                       value="{{ (prefill_val or [])[i-1] if prefill_val and prefill_val|length >= i else '' }}" />
+              </div>
+              {% endfor %}
+            </div>
+
+          {% else %}
+            <!-- text, and any unknown type -->
+            <input id="f_{{ loop.index }}" name="{{ label }}" type="text"
+                   class="wf-input"
+                   value="{{ prefill_val }}"
+                   {% if req %}required{% endif %} />
+          {% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="wf-submit-wrap">
+          <button type="submit" class="wf-submit">&#10003;&nbsp; Submit Form</button>
+        </div>
+
+      </form>
+    </div>
+    {% endif %}
+
+  </div><!-- /wf-card -->
+
+  <div class="wf-footer">
+    Powered by <span>WebToForm</span> &nbsp;&mdash;&nbsp; Built by <span>Herve</span>
+  </div>
+
+</div>
+<script>
+  // Default all empty date inputs to today
+  (function () {
+    const today = new Date();
+    const iso = today.getFullYear() + '-' +
+      String(today.getMonth() + 1).padStart(2, '0') + '-' +
+      String(today.getDate()).padStart(2, '0');
+    document.querySelectorAll('input[type="date"]').forEach(function (el) {
+      if (!el.value) el.value = iso;
+    });
+  })();
+</script>
+</body>
+</html>

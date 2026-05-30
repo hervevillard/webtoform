@@ -146,7 +146,7 @@ def _render_text(pm: PageManager, label: str, required: bool,
     _draw_label(pm.c, MARGIN_X, label_y, label, required)
 
     field_y = label_y - GAP_LABEL - fh
-    pm.c.acroForm.textfield(
+    kwargs = dict(
         name=field_name,
         tooltip=label,
         x=MARGIN_X, y=field_y,
@@ -155,10 +155,12 @@ def _render_text(pm: PageManager, label: str, required: bool,
         fillColor=COL_FIELD_BG,
         textColor=colors.HexColor("#1C1C2E"),
         borderWidth=1,
-        multiline=multiline,
         fontSize=BODY_SIZE,
         fontName=BODY_FONT,
     )
+    if multiline:
+        kwargs["fieldFlags"] = "multiline"
+    pm.c.acroForm.textfield(**kwargs)
     pm.y = field_y - GAP_AFTER_FIELD
 
 

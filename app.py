@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 from pathlib import Path
 
@@ -19,6 +20,7 @@ app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB
 BASE_DIR = Path(__file__).parent
 UPLOAD_DIR = BASE_DIR / "uploads"
 OUTPUT_DIR = BASE_DIR / "output"
+ENV_FILE   = BASE_DIR / ".env"
 UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -29,9 +31,42 @@ def _allowed(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def _persist_api_key(key: str):
+    """Write/update DEEPSEEK_API_KEY in the .env file."""
+    content = ENV_FILE.read_text(encoding="utf-8") if ENV_FILE.exists() else ""
+    pattern = re.compile(r"^DEEPSEEK_API_KEY=.*$", re.MULTILINE)
+    new_line = f"DEEPSEEK_API_KEY={key}"
+    if pattern.search(content):
+        content = pattern.sub(new_line, content)
+    else:
+        content = content.rstrip("\n") + f"\n{new_line}\n"
+    ENV_FILE.write_text(content, encoding="utf-8")
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api-key-status")
+def api_key_status():
+    key = os.environ.get("DEEPSEEK_API_KEY", "")
+    is_set = bool(key) and key != "sk-your-deepseek-api-key-here"
+    return jsonify({"key_set": is_set})
+
+
+@app.route("/set-api-key", methods=["POST"])
+def set_api_key():
+    data = request.get_json(silent=True) or {}
+    key = (data.get("api_key") or "").strip()
+    if not key:
+        return jsonify({"error": "API key cannot be empty."}), 400
+    os.environ["DEEPSEEK_API_KEY"] = key
+    try:
+        _persist_api_key(key)
+    except Exception:
+        pass  # saving to .env is best-effort; runtime env is already updated
+    return jsonify({"ok": True})
 
 
 @app.route("/upload", methods=["POST"])

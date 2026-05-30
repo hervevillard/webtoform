@@ -47,35 +47,13 @@ echo  Dependencies ready.
 :: ── .env setup ───────────────────────────────────────────────
 if not exist ".env" (
     copy ".env.example" ".env" >nul
-    echo.
-    echo  ============================================================
-    echo   SETUP REQUIRED — Action needed before the app will work:
-    echo  ============================================================
-    echo.
-    echo  A .env file has been created from .env.example.
-    echo  Please edit it now and add your DeepSeek API key:
-    echo.
-    echo    1. Open the file:  notepad .env
-    echo    2. Replace the placeholder with your real API key
-    echo    3. Save and close Notepad
-    echo    4. Run launch.bat again
-    echo.
-    echo  Get a free API key at: https://platform.deepseek.com/api_keys
-    echo.
-    start notepad .env
-    pause
-    exit /b 0
+    echo  .env file created from template.
 )
 
-:: Warn if placeholder key is still present
-findstr /C:"sk-your-deepseek-api-key-here" .env >nul 2>&1
-if not errorlevel 1 (
-    echo.
-    echo  [WARNING] Your .env file still contains the placeholder API key.
-    echo  The app will start but AI analysis will fail until you add a real key.
-    echo  Edit .env and replace DEEPSEEK_API_KEY with your actual key.
-    echo.
-)
+echo.
+echo  NOTE: If you have not set your DeepSeek API key yet,
+echo  you can enter it directly in the app after it opens.
+echo.
 
 :: ── Launch Flask ──────────────────────────────────────────────
 echo.

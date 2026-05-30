@@ -17,6 +17,40 @@
 
 <main>
 
+  <!-- API key banner (shown when key is missing) -->
+  <div id="key-banner" class="key-banner" style="display:none;">
+    <span class="key-banner-icon">&#9888;</span>
+    <span>No DeepSeek API key configured. Enter your key below before analyzing a document.</span>
+  </div>
+
+  <!-- API key settings card -->
+  <div class="card" id="key-card">
+    <div class="key-header" id="key-toggle">
+      <span id="key-status-icon" class="key-icon">&#128273;</span>
+      <div>
+        <h2 style="margin-bottom:0;">DeepSeek API Key</h2>
+        <p style="margin-bottom:0;" id="key-status-text">Checking…</p>
+      </div>
+      <span class="key-chevron" id="key-chevron">&#8964;</span>
+    </div>
+
+    <div id="key-form" style="display:none; margin-top:1.2rem;">
+      <label class="key-label" for="api-key-input">Paste your API key</label>
+      <div class="key-input-row">
+        <input type="password" id="api-key-input" class="key-input"
+               placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
+        <button class="btn btn-primary" id="key-toggle-vis" type="button" title="Show/hide key">&#128065;</button>
+      </div>
+      <p class="key-hint">
+        Get a free key at
+        <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener">platform.deepseek.com</a>.
+        The key is saved to your local <code>.env</code> file and never leaves your PC.
+      </p>
+      <button class="btn btn-primary" id="save-key-btn" style="margin-top:.5rem;">&#10003; Save Key</button>
+      <span id="key-save-status" style="margin-left:.8rem; font-size:.85rem;"></span>
+    </div>
+  </div>
+
   <!-- Upload card -->
   <div class="card">
     <h2>Generate a Fillable Customer Form</h2>

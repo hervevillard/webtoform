@@ -39,11 +39,11 @@ Double-click **`launch.bat`**.
 On first run it will:
 - Create a Python virtual environment
 - Install all dependencies automatically
-- Open `.env` in Notepad — paste your DeepSeek API key there, save, and close
+- Open the browser at `http://localhost:5000`
 
-### 3. Run again
+### 3. Enter your API key in the UI
 
-Double-click `launch.bat` a second time. Your browser will open at `http://localhost:5000`.
+If you have not set a DeepSeek API key yet, the app opens with a yellow warning banner and an expanded key panel at the top. Paste your key there and click **Save Key** — it is written to your local `.env` file automatically and never leaves your PC.
 
 ---
 

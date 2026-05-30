@@ -1,6 +1,106 @@
 (function () {
   "use strict";
 
+  // ── API key panel ────────────────────────────────────────
+  const keyBanner    = document.getElementById("key-banner");
+  const keyToggle    = document.getElementById("key-toggle");
+  const keyChevron   = document.getElementById("key-chevron");
+  const keyForm      = document.getElementById("key-form");
+  const keyStatusIcon= document.getElementById("key-status-icon");
+  const keyStatusText= document.getElementById("key-status-text");
+  const keyInput     = document.getElementById("api-key-input");
+  const keyVisBtn    = document.getElementById("key-toggle-vis");
+  const saveKeyBtn   = document.getElementById("save-key-btn");
+  const keySaveStatus= document.getElementById("key-save-status");
+
+  let keyIsSet = false;
+
+  async function checkKeyStatus() {
+    try {
+      const res = await fetch("/api-key-status");
+      const data = await res.json();
+      keyIsSet = data.key_set;
+    } catch (_) {
+      keyIsSet = false;
+    }
+    renderKeyState();
+  }
+
+  function renderKeyState() {
+    if (keyIsSet) {
+      keyStatusIcon.textContent = "✅"; // ✅
+      keyStatusText.textContent = "API key is configured";
+      keyStatusText.style.color = "var(--green)";
+      keyBanner.style.display = "none";
+      // Collapse form if key is already set
+      if (keyForm.style.display !== "none") collapseKeyForm();
+    } else {
+      keyStatusIcon.textContent = "⚠️"; // ⚠️
+      keyStatusText.textContent = "No API key — expand to add one";
+      keyStatusText.style.color = "var(--red)";
+      keyBanner.style.display = "flex";
+      expandKeyForm();
+    }
+  }
+
+  function expandKeyForm() {
+    keyForm.style.display = "block";
+    keyChevron.classList.add("open");
+  }
+
+  function collapseKeyForm() {
+    keyForm.style.display = "none";
+    keyChevron.classList.remove("open");
+  }
+
+  keyToggle.addEventListener("click", () => {
+    if (keyForm.style.display === "none") expandKeyForm();
+    else collapseKeyForm();
+  });
+
+  keyVisBtn.addEventListener("click", () => {
+    keyInput.type = keyInput.type === "password" ? "text" : "password";
+  });
+
+  saveKeyBtn.addEventListener("click", async () => {
+    const key = keyInput.value.trim();
+    if (!key) {
+      keySaveStatus.textContent = "Please paste a key first.";
+      keySaveStatus.style.color = "var(--red)";
+      return;
+    }
+    saveKeyBtn.disabled = true;
+    keySaveStatus.textContent = "Saving…";
+    keySaveStatus.style.color = "var(--grey-sub)";
+    try {
+      const res = await fetch("/set-api-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: key }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        keyInput.value = "";
+        keySaveStatus.textContent = "Saved!";
+        keySaveStatus.style.color = "var(--green)";
+        keyIsSet = true;
+        renderKeyState();
+        setTimeout(() => { keySaveStatus.textContent = ""; }, 3000);
+      } else {
+        keySaveStatus.textContent = data.error || "Failed to save.";
+        keySaveStatus.style.color = "var(--red)";
+      }
+    } catch (_) {
+      keySaveStatus.textContent = "Network error.";
+      keySaveStatus.style.color = "var(--red)";
+    }
+    saveKeyBtn.disabled = false;
+  });
+
+  // Check key status on page load
+  checkKeyStatus();
+
+  // ── Upload / analysis ────────────────────────────────────
   const dropZone   = document.getElementById("drop-zone");
   const fileInput  = document.getElementById("file-input");
   const fileNameEl = document.getElementById("file-name");

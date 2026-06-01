@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% if session %}{{ session.title }}{% else %}Sign Document{% endif %} - WebToForm</title>
   <link rel="stylesheet" href="/static/css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <style>
     body {
       background: var(--bg);
@@ -147,6 +148,68 @@
       cursor: pointer;
     }
 
+    .sig-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .sig-tab-btn {
+      flex: 1;
+      padding: .38rem .5rem;
+      font: inherit;
+      font-size: .76rem;
+      font-weight: 700;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: var(--ivory-dark, #f5f0e8);
+      color: var(--text-muted, #999);
+      cursor: pointer;
+      transition: color .15s, border-color .15s, background .15s;
+      letter-spacing: .02em;
+    }
+    .sig-tab-btn.active {
+      color: var(--gold);
+      border-bottom-color: var(--gold);
+      background: #fff;
+    }
+    .sig-type-wrap {
+      display: none;
+      position: absolute;
+      inset: 38px 0 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      padding: 1rem;
+      gap: .5rem;
+      z-index: 1;
+    }
+    .sig-pad-wrap.mode-type .sig-type-wrap { display: flex; }
+    .sig-type-input {
+      width: 100%;
+      border: none;
+      border-bottom: 1.5px solid var(--border);
+      outline: none;
+      font-family: 'Dancing Script', cursive;
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #1C1C2E;
+      text-align: center;
+      background: transparent;
+      padding: .2rem .5rem;
+      transition: border-color .15s;
+    }
+    .sig-type-input:focus { border-bottom-color: var(--gold); }
+    .sig-type-input::placeholder {
+      font-family: 'Dancing Script', cursive;
+      color: #ccc;
+      font-size: 1.6rem;
+      font-weight: 400;
+    }
+    .sig-type-hint {
+      font-size: .72rem;
+      color: var(--text-muted);
+    }
+
     .sign-submit {
       margin-top: .2rem;
       padding: .85rem;
@@ -216,11 +279,19 @@
 
             {% if field.type == "signature" %}
               <input type="hidden" name="{{ field.key }}" id="{{ field.key }}" value="{{ value }}" />
-              <div class="sig-pad-wrap">
+              <div class="sig-pad-wrap mode-draw">
+                <div class="sig-tabs">
+                  <button type="button" class="sig-tab-btn active" data-mode="draw" data-pad="{{ field.key }}">✏&nbsp;Draw</button>
+                  <button type="button" class="sig-tab-btn" data-mode="type" data-pad="{{ field.key }}">T&nbsp;Type</button>
+                </div>
                 <canvas class="sig-pad" data-target="{{ field.key }}" data-required="{{ '1' if field.required else '0' }}"></canvas>
+                <div class="sig-type-wrap" data-type-wrap="{{ field.key }}">
+                  <input class="sig-type-input" type="text" placeholder="Type your full name…" autocomplete="off" data-type-input="{{ field.key }}" />
+                  <span class="sig-type-hint">Your name will appear as your signature</span>
+                </div>
               </div>
               <div class="sig-actions">
-                <span class="sig-help">Draw signature in the box.</span>
+                <span class="sig-help">Draw or type your signature above.</span>
                 <button type="button" class="sig-clear" data-clear="{{ field.key }}">Clear</button>
               </div>
             {% else %}
@@ -245,14 +316,32 @@
   {% if session and not submitted %}
   <script>
     (function () {
+      function renderTextToCanvas(canvas, text) {
+        const ctx = canvas.getContext("2d");
+        const rect = canvas.getBoundingClientRect();
+        ctx.clearRect(0, 0, rect.width, rect.height);
+        if (!text) return;
+        const fontSize = Math.min(rect.height * 0.5, 56);
+        ctx.font = `bold ${fontSize}px "Dancing Script", cursive`;
+        ctx.fillStyle = "#1C1C2E";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, rect.width / 2, rect.height / 2, rect.width - 24);
+      }
+
       function setupPad(canvas) {
         const targetId = canvas.dataset.target;
         const hidden = document.getElementById(targetId);
-        if (!hidden) return;
+        if (!hidden) return null;
 
         const ctx = canvas.getContext("2d");
         let drawing = false;
         let dirty = false;
+        let hasStroke = false;
+        let mode = "draw";
+
+        const wrap = canvas.closest(".sig-pad-wrap");
+        const typeInput = wrap && wrap.querySelector("[data-type-input]");
 
         function resize() {
           const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -267,52 +356,91 @@
           ctx.lineCap = "round";
           ctx.lineJoin = "round";
           ctx.strokeStyle = "#1C1C2E";
-          if (hidden.value) {
-            const img = new Image();
-            img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
-            img.src = hidden.value;
-          }
         }
 
         function point(evt) {
           const rect = canvas.getBoundingClientRect();
-          const src = evt.touches ? evt.touches[0] : evt;
-          return {
-            x: src.clientX - rect.left,
-            y: src.clientY - rect.top,
-          };
+          return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+        }
+
+        function saveToHidden() {
+          hidden.value = canvas.toDataURL("image/png");
         }
 
         function start(evt) {
+          if (mode !== "draw") return;
           evt.preventDefault();
+          if (evt.button !== undefined && evt.button !== 0) return;
           drawing = true;
+          dirty = false;
+          canvas.setPointerCapture(evt.pointerId);
           const p = point(evt);
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
         }
 
         function move(evt) {
-          if (!drawing) return;
+          if (!drawing || mode !== "draw") return;
           evt.preventDefault();
           const p = point(evt);
           ctx.lineTo(p.x, p.y);
           ctx.stroke();
           dirty = true;
+          hasStroke = true;
+          saveToHidden();
         }
 
-        function end() {
+        function end(evt) {
           if (!drawing) return;
+          evt.preventDefault();
           drawing = false;
-          if (!dirty) return;
-          hidden.value = canvas.toDataURL("image/png");
+          canvas.releasePointerCapture(evt.pointerId);
+          if (dirty) saveToHidden();
         }
 
-        canvas.addEventListener("mousedown", start);
-        canvas.addEventListener("mousemove", move);
-        window.addEventListener("mouseup", end);
-        canvas.addEventListener("touchstart", start, { passive: false });
-        canvas.addEventListener("touchmove", move, { passive: false });
-        canvas.addEventListener("touchend", end);
+        canvas.addEventListener("pointerdown", start);
+        canvas.addEventListener("pointermove", move);
+        canvas.addEventListener("pointerup", end);
+        canvas.addEventListener("pointercancel", end);
+
+        if (typeInput) {
+          typeInput.addEventListener("input", () => {
+            const text = typeInput.value.trim();
+            renderTextToCanvas(canvas, text);
+            hidden.value = text ? canvas.toDataURL("image/png") : "";
+          });
+        }
+
+        wrap && wrap.querySelectorAll(".sig-tab-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            wrap.querySelectorAll(".sig-tab-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+            const newMode = btn.dataset.mode;
+            if (newMode === "draw") {
+              mode = "draw";
+              wrap.classList.remove("mode-type");
+              wrap.classList.add("mode-draw");
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              hidden.value = "";
+              hasStroke = false;
+              if (typeInput) typeInput.value = "";
+              resize();
+            } else {
+              mode = "type";
+              wrap.classList.remove("mode-draw");
+              wrap.classList.add("mode-type");
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              hasStroke = false;
+              if (typeInput && typeInput.value.trim()) {
+                renderTextToCanvas(canvas, typeInput.value.trim());
+                hidden.value = canvas.toDataURL("image/png");
+              } else {
+                hidden.value = "";
+              }
+              if (typeInput) typeInput.focus();
+            }
+          });
+        });
 
         const clearBtn = document.querySelector('[data-clear="' + targetId + '"]');
         if (clearBtn) {
@@ -321,29 +449,35 @@
             ctx.clearRect(0, 0, rect.width, rect.height);
             hidden.value = "";
             dirty = false;
+            hasStroke = false;
+            if (typeInput) typeInput.value = "";
           });
         }
 
         resize();
         window.addEventListener("resize", resize);
+
+        return {
+          canvas,
+          hidden,
+          isRequired: canvas.dataset.required === "1",
+          hasSignature: () => hasStroke || !!hidden.value,
+          flush: saveToHidden,
+        };
       }
 
-      document.querySelectorAll(".sig-pad").forEach(setupPad);
+      const pads = Array.from(document.querySelectorAll(".sig-pad"))
+        .map(setupPad)
+        .filter(Boolean);
 
       document.getElementById("sign-form")?.addEventListener("submit", (evt) => {
-        const missing = [];
-        document.querySelectorAll(".sig-pad").forEach((canvas) => {
-          if (canvas.dataset.required !== "1") return;
-          const key = canvas.dataset.target;
-          const hidden = document.getElementById(key);
-          if (!hidden || !hidden.value) {
-            missing.push(key);
-          }
+        pads.forEach((pad) => {
+          if (pad.hasSignature()) pad.flush();
         });
-
+        const missing = pads.filter(p => p.isRequired && !p.hasSignature());
         if (missing.length > 0) {
           evt.preventDefault();
-          alert("Please draw all required signatures before submitting.");
+          alert("Please complete all required signatures before submitting.");
         }
       });
     })();

@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="/static/css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet" />
   <style>
     /* ── Customer form page overrides ── */
     body { background: var(--bg); }
@@ -146,6 +147,108 @@
     .wf-add-item-btn:hover { background: var(--gold); color: var(--midnight); }
     .wf-list-details-label { margin-top: .75rem; font-size: .72rem; opacity: .75; }
     .wf-list-details { min-height: 70px; }
+
+    /* Signature field */
+    .wf-sig-wrap {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      overflow: hidden;
+    }
+    .wf-sig-pad {
+      display: block;
+      width: 100%;
+      height: 170px;
+      touch-action: none;
+      cursor: crosshair;
+      background: #fff;
+    }
+    .wf-sig-actions {
+      border-top: 1px solid var(--border);
+      background: var(--ivory-dark);
+      padding: .45rem .6rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: .6rem;
+    }
+    .wf-sig-help {
+      font-size: .75rem;
+      color: var(--text-muted);
+    }
+    .wf-sig-clear {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: .76rem;
+      padding: .28rem .62rem;
+      cursor: pointer;
+    }
+
+    .wf-sig-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .wf-sig-tab-btn {
+      flex: 1;
+      padding: .38rem .5rem;
+      font: inherit;
+      font-size: .76rem;
+      font-weight: 700;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: var(--ivory-dark, #f5f0e8);
+      color: var(--text-muted, #999);
+      cursor: pointer;
+      transition: color .15s, border-color .15s, background .15s;
+      letter-spacing: .02em;
+    }
+    .wf-sig-tab-btn.active {
+      color: var(--gold);
+      border-bottom-color: var(--gold);
+      background: #fff;
+    }
+    .wf-sig-type-wrap {
+      display: none;
+      position: absolute;
+      inset: 38px 0 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      padding: 1rem;
+      gap: .5rem;
+      z-index: 1;
+    }
+    .wf-sig-wrap { position: relative; }
+    .wf-sig-wrap.mode-type .wf-sig-type-wrap { display: flex; }
+    .wf-sig-type-input {
+      width: 100%;
+      border: none;
+      border-bottom: 1.5px solid var(--border);
+      outline: none;
+      font-family: 'Dancing Script', cursive;
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: #1C1C2E;
+      text-align: center;
+      background: transparent;
+      padding: .2rem .5rem;
+      transition: border-color .15s;
+    }
+    .wf-sig-type-input:focus { border-bottom-color: var(--gold); }
+    .wf-sig-type-input::placeholder {
+      font-family: 'Dancing Script', cursive;
+      color: #ccc;
+      font-size: 1.6rem;
+      font-weight: 400;
+    }
+    .wf-sig-type-hint {
+      font-size: .72rem;
+      color: var(--text-muted);
+    }
 
     /* Submit button */
     .wf-submit-wrap { margin-top: 1.8rem; border-top: 1px solid var(--border); padding-top: 1.5rem; }
@@ -325,6 +428,25 @@
                       class="wf-textarea wf-list-details"
                       placeholder="Any extra context or details…"></textarea>
 
+          {% elif ftype == 'signature' %}
+            <input type="hidden" id="f_{{ loop.index }}" name="{{ label }}"
+                   value="{{ prefill_val if prefill_val is string else '' }}" />
+            <div class="wf-sig-wrap mode-draw">
+              <div class="wf-sig-tabs">
+                <button type="button" class="wf-sig-tab-btn active" data-mode="draw" data-pad="f_{{ loop.index }}">✏&nbsp;Draw</button>
+                <button type="button" class="wf-sig-tab-btn" data-mode="type" data-pad="f_{{ loop.index }}">T&nbsp;Type</button>
+              </div>
+              <canvas class="wf-sig-pad" data-target="f_{{ loop.index }}" data-required="{{ '1' if req else '0' }}"></canvas>
+              <div class="wf-sig-type-wrap" data-type-wrap="f_{{ loop.index }}">
+                <input class="wf-sig-type-input" type="text" placeholder="Type your full name…" autocomplete="off" data-type-input="f_{{ loop.index }}" />
+                <span class="wf-sig-type-hint">Your name will appear as your signature</span>
+              </div>
+              <div class="wf-sig-actions">
+                <span class="wf-sig-help">Draw or type your signature above.</span>
+                <button type="button" class="wf-sig-clear" data-clear="f_{{ loop.index }}">Clear</button>
+              </div>
+            </div>
+
           {% else %}
             <!-- text, and any unknown type -->
             <input id="f_{{ loop.index }}" name="{{ label }}" type="text"
@@ -377,6 +499,172 @@
         row.querySelector('input').focus();
       });
     });
+
+    function renderTextToCanvas(canvas, text) {
+      var ctx = canvas.getContext('2d');
+      var rect = canvas.getBoundingClientRect();
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      if (!text) return;
+      var fontSize = Math.min(rect.height * 0.5, 56);
+      ctx.font = 'bold ' + fontSize + 'px "Dancing Script", cursive';
+      ctx.fillStyle = '#1C1C2E';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, rect.width / 2, rect.height / 2, rect.width - 24);
+    }
+
+    function setupSignaturePad(canvas) {
+      var targetId = canvas.dataset.target;
+      var hidden = document.getElementById(targetId);
+      if (!hidden) return null;
+
+      var ctx = canvas.getContext('2d');
+      var drawing = false;
+      var hasStroke = false;
+      var mode = 'draw';
+
+      var wrap = canvas.closest('.wf-sig-wrap');
+      var typeInput = wrap && wrap.querySelector('[data-type-input]');
+
+      function resize() {
+        var ratio = Math.max(window.devicePixelRatio || 1, 1);
+        var rect = canvas.getBoundingClientRect();
+        var w = Math.max(1, Math.floor(rect.width * ratio));
+        var h = Math.max(1, Math.floor(rect.height * ratio));
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width = w;
+          canvas.height = h;
+          ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+          ctx.lineWidth = 2;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.strokeStyle = '#1C1C2E';
+        }
+      }
+
+      function point(evt) {
+        var rect = canvas.getBoundingClientRect();
+        return { x: evt.clientX - rect.left, y: evt.clientY - rect.top };
+      }
+
+      function flush() {
+        hidden.value = canvas.toDataURL('image/png');
+      }
+
+      function start(evt) {
+        if (mode !== 'draw') return;
+        evt.preventDefault();
+        if (evt.button !== undefined && evt.button !== 0) return;
+        drawing = true;
+        canvas.setPointerCapture(evt.pointerId);
+        var p = point(evt);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+      }
+
+      function move(evt) {
+        if (!drawing || mode !== 'draw') return;
+        evt.preventDefault();
+        var p = point(evt);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+        hasStroke = true;
+      }
+
+      function end(evt) {
+        if (!drawing) return;
+        evt.preventDefault();
+        drawing = false;
+        canvas.releasePointerCapture(evt.pointerId);
+        flush();
+      }
+
+      canvas.addEventListener('pointerdown', start);
+      canvas.addEventListener('pointermove', move);
+      canvas.addEventListener('pointerup', end);
+      canvas.addEventListener('pointercancel', end);
+
+      if (typeInput) {
+        typeInput.addEventListener('input', function () {
+          var text = typeInput.value.trim();
+          renderTextToCanvas(canvas, text);
+          hidden.value = text ? canvas.toDataURL('image/png') : '';
+        });
+      }
+
+      if (wrap) {
+        wrap.querySelectorAll('.wf-sig-tab-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            wrap.querySelectorAll('.wf-sig-tab-btn').forEach(function (b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            var newMode = btn.dataset.mode;
+            if (newMode === 'draw') {
+              mode = 'draw';
+              wrap.classList.remove('mode-type');
+              wrap.classList.add('mode-draw');
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              hidden.value = '';
+              hasStroke = false;
+              if (typeInput) typeInput.value = '';
+              resize();
+            } else {
+              mode = 'type';
+              wrap.classList.remove('mode-draw');
+              wrap.classList.add('mode-type');
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              hasStroke = false;
+              if (typeInput && typeInput.value.trim()) {
+                renderTextToCanvas(canvas, typeInput.value.trim());
+                hidden.value = canvas.toDataURL('image/png');
+              } else {
+                hidden.value = '';
+              }
+              if (typeInput) typeInput.focus();
+            }
+          });
+        });
+      }
+
+      var clearBtn = document.querySelector('[data-clear="' + targetId + '"]');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', function () {
+          var rect = canvas.getBoundingClientRect();
+          ctx.clearRect(0, 0, rect.width, rect.height);
+          hidden.value = '';
+          hasStroke = false;
+          if (typeInput) typeInput.value = '';
+        });
+      }
+
+      resize();
+      window.addEventListener('resize', resize);
+
+      return {
+        isRequired: canvas.dataset.required === '1',
+        hasSignature: function () { return hasStroke || !!hidden.value; },
+        flush: flush,
+      };
+    }
+
+    var pads = Array.from(document.querySelectorAll('.wf-sig-pad'))
+      .map(setupSignaturePad)
+      .filter(Boolean);
+
+    var formEl = document.querySelector('form[action$="/submit"]');
+    if (formEl) {
+      formEl.addEventListener('submit', function (evt) {
+        pads.forEach(function (pad) {
+          if (pad.hasSignature()) pad.flush();
+        });
+        var missing = pads.some(function (pad) {
+          return pad.isRequired && !pad.hasSignature();
+        });
+        if (missing) {
+          evt.preventDefault();
+          alert('Please complete all required signatures before submitting.');
+        }
+      });
+    }
   })();
 </script>
 </body>

@@ -146,7 +146,7 @@ After any of the following, update the relevant section of `CLAUDE.md` before cl
 | Type | Rendered as |
 |---|---|
 | `text` | Single-line AcroForm textfield |
-| `signature` | AcroForm signature widget (or textfield fallback if viewer/library lacks signature widget support) |
+| `signature` | Reliable fillable signature fallback field in generated PDFs; for drawn e-sign capture use web signing flow |
 | `textarea` | Multi-line AcroForm textfield |
 | `date` | Single-line textfield with `(MM / DD / YYYY)` hint |
 | `email` | Single-line textfield with email hint |
@@ -154,7 +154,7 @@ After any of the following, update the relevant section of `CLAUDE.md` before cl
 | `checkbox` | AcroForm checkbox widget |
 | `list` | Section header + 5 numbered AcroForm textfield rows |
 
-**Visual Fillable note:** Visual placement mode currently supports `text` and `signature` field types.
+**Visual Fillable note:** Visual placement mode supports `text` and `signature` field types, and generated PDFs use a reliable fillable signature fallback.
 Use **Create Web Sign Link** when you need DocuSign-style drawn signatures captured in-browser and embedded into the final PDF.
 
 **Note on date popup:** True calendar date-picker in PDF requires Adobe Acrobat JavaScript, which ReportLab's public canvas API does not expose. Date fields use a clearly-labelled text input as the best available cross-viewer alternative.

@@ -9,7 +9,7 @@ that needs to be collected from a customer to process their request.
 Return ONLY a valid JSON array — no markdown, no explanation, no code fences.
 Each element must be an object with exactly these keys:
   - "label"    : string — a clear, human-readable field name (e.g. "Full Legal Name")
-  - "type"     : one of: "text", "textarea", "date", "email", "phone", "checkbox", "list"
+    - "type"     : one of: "text", "textarea", "date", "email", "phone", "checkbox", "list", "signature"
   - "required" : boolean — true if this field is essential
 
 Type guidance:
@@ -23,6 +23,7 @@ Type guidance:
                  (e.g. "Named Drivers", "Previous Claims", "Beneficiaries", "Dependants",
                  "Properties Covered", "Medications"). Use list whenever the document implies
                  ADD / multiple rows.
+    - "signature": use for explicit signature lines (e.g. "Customer Signature", "Applicant Signature")
 
 Focus on:
 - Personal identification (name, DOB, SSN last 4, address)
@@ -31,7 +32,8 @@ Focus on:
 - Vehicle / property / health details as applicable
 - Beneficiary and dependent information (use type "list")
 - Named drivers, previous claims, covered items (use type "list")
-- Declarations and signature fields (use type "checkbox")
+- Declarations (use type "checkbox")
+- Signature lines (use type "signature")
 
 Do NOT include fields filled by the insurance company (agent name, internal codes, stamps).
 Deduplicate fields. Aim for 10–25 fields. Output only the JSON array."""
@@ -67,7 +69,7 @@ def analyze_document(text: str) -> list[dict]:
 
     fields = json.loads(raw)
 
-    valid_types = {"text", "textarea", "date", "email", "phone", "checkbox", "list"}
+    valid_types = {"text", "textarea", "date", "email", "phone", "checkbox", "list", "signature"}
     result = []
     for f in fields:
         if not isinstance(f, dict) or "label" not in f:

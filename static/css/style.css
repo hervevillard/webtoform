@@ -826,6 +826,10 @@ footer span { color: var(--gold); font-weight: 600; }
   box-shadow: 0 0 0 3px rgba(201,168,76,.16);
 }
 
+#visual-file-input {
+  display: none;
+}
+
 .visual-controls {
   display: flex;
   align-items: center;
@@ -874,20 +878,65 @@ footer span { color: var(--gold); font-weight: 600; }
   font-weight: 700;
   overflow: hidden;
   pointer-events: auto;
+  cursor: move;
+  user-select: none;
 }
 
-.visual-box.checkbox {
+.visual-box.signature {
   border-color: var(--terracotta);
-  background: transparent;
   color: #7a2e15;
 }
 
-.visual-box span {
+.visual-box.selected {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(201,168,76,.25);
+}
+
+.visual-box-label {
   display: block;
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  padding: 1px 3px;
+  padding: 1px 16px 1px 3px;
+  pointer-events: none;
+}
+
+.visual-box-delete {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(28,28,46,.75);
+  color: #fff;
+  font-size: .58rem;
+  line-height: 1;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.visual-box-resize {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid rgba(28,28,46,.65);
+  border-bottom: 2px solid rgba(28,28,46,.65);
+  cursor: nwse-resize;
+  display: none;
+}
+
+.visual-box:hover .visual-box-delete,
+.visual-box:hover .visual-box-resize,
+.visual-box.selected .visual-box-delete,
+.visual-box.selected .visual-box-resize {
+  display: flex;
 }
 
 .visual-box-drawing {

@@ -30,7 +30,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 ALLOWED_EXTENSIONS  = {"pdf"}
-VALID_FIELD_TYPES   = {"text", "textarea", "date", "email", "phone", "checkbox", "list"}
+VALID_FIELD_TYPES   = {"text", "textarea", "date", "email", "phone", "checkbox", "list", "signature"}
 
 
 def _get_lan_ip() -> str:
@@ -350,6 +350,8 @@ def submit_form(form_id: str):
         ftype = field["type"]
         if ftype == "checkbox":
             submission_data[label] = "Yes" if request.form.get(label) else "No"
+        elif ftype == "signature":
+            submission_data[label] = request.form.get(label, "")
         elif ftype == "list":
             prefix = f"{label}_"
             numbered = sorted(

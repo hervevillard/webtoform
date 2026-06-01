@@ -43,7 +43,9 @@
   let visualPageHeightPts = 0;
   let visualFields = [];
   let visualFieldSeq = 0;
+  let visualSelectedFieldId = null;
   let drawState = null;
+  let editState = null;
   const pdfjs = window.pdfjsLib || globalThis.pdfjsLib || null;
 
   if (pdfjs) {
@@ -83,6 +85,9 @@
         <button type="button" class="btn-danger-ghost" title="Remove">&#10005;</button>`;
       li.querySelector("button").addEventListener("click", () => {
         visualFields = visualFields.filter(x => x.id !== f.id);
+        if (visualSelectedFieldId === f.id) {
+          visualSelectedFieldId = null;
+        }
         updateVisualFieldState();
         renderVisualOverlay();
       });
@@ -97,6 +102,9 @@
     visualPageHeightPts = 0;
     visualFields = [];
     visualFieldSeq = 0;
+    visualSelectedFieldId = null;
+    drawState = null;
+    editState = null;
     const ctx = visualCanvas.getContext("2d");
     ctx.clearRect(0, 0, visualCanvas.width, visualCanvas.height);
     visualOverlay.innerHTML = "";
@@ -154,10 +162,18 @@
     const overlayHeightPx = visualOverlay.clientHeight || visualCanvas.clientHeight;
     if (!overlayWidthPx || !overlayHeightPx) return;
 
+    if (visualSelectedFieldId && !visualFields.some(f => f.id === visualSelectedFieldId)) {
+      visualSelectedFieldId = null;
+    }
+
     const pageFields = visualFields.filter(f => f.page === visualPageNumber);
     pageFields.forEach(field => {
       const box = document.createElement("div");
       box.className = `visual-box ${field.type === "signature" ? "signature" : "text"}`;
+      box.dataset.fieldId = String(field.id);
+      if (field.id === visualSelectedFieldId) {
+        box.classList.add("selected");
+      }
 
       const left = (field.x / visualPageWidthPts) * overlayWidthPx;
       const top = ((visualPageHeightPts - (field.y + field.height)) / visualPageHeightPts) * overlayHeightPx;
@@ -168,10 +184,33 @@
       box.style.top = `${top}px`;
       box.style.width = `${width}px`;
       box.style.height = `${height}px`;
-      box.innerHTML = `<span>${escHtml(field.label)}</span>`;
+      box.innerHTML = `
+        <span class="visual-box-label">${escHtml(field.label)}</span>
+        <button type="button" class="visual-box-delete" title="Delete field">&#10005;</button>
+        <span class="visual-box-resize" title="Resize"></span>`;
+
+      box.addEventListener("click", (event) => {
+        event.stopPropagation();
+        visualSelectedFieldId = field.id;
+        renderVisualOverlay();
+      });
+
+      box.querySelector(".visual-box-delete").addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        visualFields = visualFields.filter(f => f.id !== field.id);
+        if (visualSelectedFieldId === field.id) {
+          visualSelectedFieldId = null;
+        }
+        updateVisualFieldState();
+        renderVisualOverlay();
+      });
 
       box.addEventListener("dblclick", () => {
         visualFields = visualFields.filter(f => f.id !== field.id);
+        if (visualSelectedFieldId === field.id) {
+          visualSelectedFieldId = null;
+        }
         updateVisualFieldState();
         renderVisualOverlay();
       });
@@ -201,7 +240,8 @@
       });
   }
 
-  visualDropZone.addEventListener("click", () => {
+  visualDropZone.addEventListener("click", (event) => {
+    if (event.target === visualFileInput) return;
     visualFileInput.value = "";
     visualFileInput.click();
   });
@@ -230,12 +270,16 @@
 
   visualClearPageBtn.addEventListener("click", () => {
     visualFields = visualFields.filter(f => f.page !== visualPageNumber);
+    if (visualSelectedFieldId && !visualFields.some(f => f.id === visualSelectedFieldId)) {
+      visualSelectedFieldId = null;
+    }
     updateVisualFieldState();
     renderVisualOverlay();
   });
 
   visualClearAllBtn.addEventListener("click", () => {
     visualFields = [];
+    visualSelectedFieldId = null;
     updateVisualFieldState();
     renderVisualOverlay();
   });
@@ -250,8 +294,82 @@
     };
   }
 
+  function findVisualField(id) {
+    return visualFields.find(f => f.id === id) || null;
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function pxRectFromField(field) {
+    const overlayWidthPx = visualOverlay.clientWidth;
+    const overlayHeightPx = visualOverlay.clientHeight;
+    return {
+      left: (field.x / visualPageWidthPts) * overlayWidthPx,
+      top: ((visualPageHeightPts - (field.y + field.height)) / visualPageHeightPts) * overlayHeightPx,
+      width: (field.width / visualPageWidthPts) * overlayWidthPx,
+      height: (field.height / visualPageHeightPts) * overlayHeightPx,
+    };
+  }
+
+  function updateFieldFromPxRect(field, rect) {
+    const overlayWidthPx = visualOverlay.clientWidth;
+    const overlayHeightPx = visualOverlay.clientHeight;
+    if (!overlayWidthPx || !overlayHeightPx) return;
+
+    field.x = Number(((rect.left / overlayWidthPx) * visualPageWidthPts).toFixed(2));
+    field.y = Number((visualPageHeightPts - (((rect.top + rect.height) / overlayHeightPx) * visualPageHeightPts)).toFixed(2));
+    field.width = Number(((rect.width / overlayWidthPx) * visualPageWidthPts).toFixed(2));
+    field.height = Number(((rect.height / overlayHeightPx) * visualPageHeightPts).toFixed(2));
+  }
+
+  function beginEdit(event, mode) {
+    const box = event.target.closest(".visual-box");
+    if (!box || !visualPdfDoc) return;
+
+    const fieldId = Number(box.dataset.fieldId);
+    const field = findVisualField(fieldId);
+    if (!field) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    visualSelectedFieldId = fieldId;
+    const start = getOverlayPoint(event);
+    const startRect = pxRectFromField(field);
+
+    editState = {
+      mode,
+      fieldId,
+      box,
+      start,
+      startRect,
+    };
+
+    box.classList.add("selected");
+  }
+
   visualOverlay.addEventListener("mousedown", (event) => {
     if (!visualPdfDoc) return;
+
+    const deleteBtn = event.target.closest(".visual-box-delete");
+    if (deleteBtn) return;
+
+    const resizeHandle = event.target.closest(".visual-box-resize");
+    if (resizeHandle) {
+      beginEdit(event, "resize");
+      return;
+    }
+
+    const targetBox = event.target.closest(".visual-box");
+    if (targetBox) {
+      beginEdit(event, "move");
+      return;
+    }
+
+    visualSelectedFieldId = null;
+    renderVisualOverlay();
 
     const start = getOverlayPoint(event);
     const ghost = document.createElement("div");
@@ -266,6 +384,33 @@
   });
 
   visualOverlay.addEventListener("mousemove", (event) => {
+    if (editState) {
+      const now = getOverlayPoint(event);
+      const overlayWidthPx = visualOverlay.clientWidth;
+      const overlayHeightPx = visualOverlay.clientHeight;
+      const minSizePx = 12;
+      const nextRect = { ...editState.startRect };
+
+      if (editState.mode === "move") {
+        const dx = now.x - editState.start.x;
+        const dy = now.y - editState.start.y;
+        nextRect.left = clamp(editState.startRect.left + dx, 0, overlayWidthPx - editState.startRect.width);
+        nextRect.top = clamp(editState.startRect.top + dy, 0, overlayHeightPx - editState.startRect.height);
+      } else if (editState.mode === "resize") {
+        const dx = now.x - editState.start.x;
+        const dy = now.y - editState.start.y;
+        nextRect.width = clamp(editState.startRect.width + dx, minSizePx, overlayWidthPx - editState.startRect.left);
+        nextRect.height = clamp(editState.startRect.height + dy, minSizePx, overlayHeightPx - editState.startRect.top);
+      }
+
+      editState.box.style.left = `${nextRect.left}px`;
+      editState.box.style.top = `${nextRect.top}px`;
+      editState.box.style.width = `${nextRect.width}px`;
+      editState.box.style.height = `${nextRect.height}px`;
+      editState.currentRect = nextRect;
+      return;
+    }
+
     if (!drawState) return;
     const now = getOverlayPoint(event);
     const x = Math.min(drawState.start.x, now.x);
@@ -323,10 +468,43 @@
     renderVisualOverlay();
   }
 
-  visualOverlay.addEventListener("mouseup", finishDrawing);
-  visualOverlay.addEventListener("mouseleave", (event) => {
-    if (!drawState) return;
+  function finishEditing() {
+    if (!editState) return;
+
+    const field = findVisualField(editState.fieldId);
+    if (field && editState.currentRect) {
+      updateFieldFromPxRect(field, editState.currentRect);
+    }
+
+    editState = null;
+    renderVisualOverlay();
+  }
+
+  visualOverlay.addEventListener("mouseup", (event) => {
+    if (editState) {
+      finishEditing();
+      return;
+    }
     finishDrawing(event);
+  });
+  visualOverlay.addEventListener("mouseleave", (event) => {
+    if (editState) {
+      finishEditing();
+      return;
+    }
+    if (drawState) finishDrawing(event);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if ((event.key === "Delete" || event.key === "Backspace") && visualSelectedFieldId && visualPdfDoc) {
+      const active = document.activeElement;
+      const typingInInput = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable);
+      if (typingInInput) return;
+      visualFields = visualFields.filter(f => f.id !== visualSelectedFieldId);
+      visualSelectedFieldId = null;
+      updateVisualFieldState();
+      renderVisualOverlay();
+    }
   });
 
   window.addEventListener("resize", () => {
@@ -589,7 +767,7 @@
   const buildFieldCount   = document.getElementById("build-field-count-text");
   const buildDownloadBtn  = document.getElementById("build-download-btn");
 
-  const FIELD_TYPES = ["text","textarea","date","email","phone","checkbox","list"];
+  const FIELD_TYPES = ["text","textarea","date","email","phone","checkbox","list","signature"];
   let fieldSeq = 0;   // unique key for each row
 
   function updateBuilderState() {
@@ -803,7 +981,7 @@
         const s  = document.createElement("div");
         s.className = "resp-submission";
         const rows = Object.entries(sub.data).map(([k, v]) => {
-          const display = Array.isArray(v) ? v.filter(Boolean).join(", ") || "—" : (v || "—");
+          const display = formatResponseValue(v);
           return `<div class="resp-field-row"><span class="resp-field-key">${escHtml(k)}</span><span class="resp-field-val">${escHtml(display)}</span></div>`;
         }).join("");
         s.innerHTML = `<div class="resp-submission-time">&#128337; ${sub.submitted.replace("T"," ")}</div>${rows}`;
@@ -923,5 +1101,17 @@
     if (b < 1024)        return b + " B";
     if (b < 1024*1024)   return (b/1024).toFixed(1) + " KB";
     return (b/1024/1024).toFixed(1) + " MB";
+  }
+
+  function formatResponseValue(value) {
+    if (Array.isArray(value)) {
+      const joined = value.filter(Boolean).join(", ");
+      return joined || "—";
+    }
+
+    const text = String(value || "").trim();
+    if (!text) return "—";
+    if (text.startsWith("data:image/")) return "[signature captured]";
+    return text;
   }
 })();

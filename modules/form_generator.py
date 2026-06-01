@@ -167,6 +167,44 @@ def _render_text(pm: PageManager, label: str, required: bool,
     pm.y = field_y - GAP_AFTER_FIELD
 
 
+def _render_signature(pm: PageManager, label: str, required: bool, field_name: str):
+    """Render a signature capture area with a text fallback widget.
+
+    ReportLab does not expose a reliable creator for true PDF signature widgets,
+    so we render a clearly-labelled signature area plus a text field fallback.
+    """
+    needed = GAP_LABEL + TEXT_H + GAP_AFTER_FIELD + 0.22 * inch + LABEL_SIZE / 72 * inch
+    pm.ensure(needed)
+
+    label_y = pm.y - LABEL_SIZE / 72 * inch
+    _draw_label(pm.c, MARGIN_X, label_y, label, required)
+
+    hint_y = label_y - 0.11 * inch
+    pm.c.setFillColor(colors.HexColor("#7A6030"))
+    pm.c.setFont(HINT_FONT, 7.5)
+    pm.c.drawString(MARGIN_X, hint_y, "Sign here (type full legal name if digital signature tool is unavailable).")
+
+    field_y = hint_y - 0.06 * inch - TEXT_H
+    pm.c.acroForm.textfield(
+        name=field_name,
+        tooltip=label,
+        x=MARGIN_X, y=field_y,
+        width=FIELD_W, height=TEXT_H,
+        borderColor=COL_FIELD_BORD,
+        fillColor=COL_FIELD_BG,
+        textColor=colors.HexColor("#1C1C2E"),
+        borderWidth=1,
+        fontSize=BODY_SIZE,
+        fontName=BODY_FONT,
+    )
+
+    # Visual underline cue for print-sign workflows.
+    pm.c.setStrokeColor(COL_FIELD_BORD)
+    pm.c.setLineWidth(0.6)
+    pm.c.line(MARGIN_X, field_y - 0.03 * inch, MARGIN_X + FIELD_W, field_y - 0.03 * inch)
+    pm.y = field_y - GAP_AFTER_FIELD - 0.05 * inch
+
+
 def _render_checkbox(pm: PageManager, label: str, required: bool, field_name: str):
     needed = CB_SIZE + GAP_AFTER_FIELD + 0.05 * inch
     pm.ensure(needed)
@@ -268,7 +306,7 @@ def create_fillable_pdf(fields: list[dict], output_path: str,
 
     Field dict keys:
       label    : str
-      type     : text | textarea | date | email | phone | checkbox | list
+    type     : text | textarea | date | email | phone | checkbox | list | signature
       required : bool
     """
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
@@ -300,6 +338,8 @@ def create_fillable_pdf(fields: list[dict], output_path: str,
             _render_text(pm, display, required, fname, multiline=True)
         elif ftype == "list":
             _render_list(pm, display, required, fname)
+        elif ftype == "signature":
+            _render_signature(pm, display, required, fname)
         elif ftype == "date":
             _render_text(pm, display, required, fname, multiline=False,
                          default_value=today_str)

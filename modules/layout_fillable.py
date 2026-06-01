@@ -97,13 +97,11 @@ def add_fillable_fields_to_existing_pdf(input_path: str, output_path: str, field
                 widget.field_type = fitz.PDF_WIDGET_TYPE_CHECKBOX
                 widget.field_value = "Off"
             elif field["type"] == "signature":
-                signature_type = getattr(fitz, "PDF_WIDGET_TYPE_SIGNATURE", None)
-                if signature_type is not None:
-                    widget.field_type = signature_type
-                else:
-                    widget.field_type = fitz.PDF_WIDGET_TYPE_TEXT
-                    widget.text_font = "Helv"
-                    widget.text_fontsize = 10
+                # Many PDF viewers only show a "Sign" badge for signature widgets
+                # and do not provide a full signing flow. Use a reliable text fallback.
+                widget.field_type = fitz.PDF_WIDGET_TYPE_TEXT
+                widget.text_font = "Helv"
+                widget.text_fontsize = 10
             else:
                 widget.field_type = fitz.PDF_WIDGET_TYPE_TEXT
                 widget.text_font = "Helv"

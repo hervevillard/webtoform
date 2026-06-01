@@ -3,6 +3,7 @@ import re
 import socket
 import uuid
 import json
+import time
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
@@ -14,7 +15,7 @@ load_dotenv()
 from modules.pdf_reader import extract_text
 from modules.deepseek_client import analyze_document
 from modules.form_generator import create_fillable_pdf
-from modules.layout_fillable import add_fillable_fields_to_existing_pdf
+from modules.layout_fillable import add_fillable_fields_to_existing_pdf, extract_existing_fillable_fields
 from modules.signing_sessions import build_signed_pdf, create_sign_session, get_sign_session
 from modules.store import create_form, get_form, add_submission, list_forms
 
@@ -57,6 +58,19 @@ def _persist_api_key(key: str):
     else:
         content = content.rstrip("\n") + f"\n{new_line}\n"
     ENV_FILE.write_text(content, encoding="utf-8")
+
+
+def _safe_unlink(path: Path, retries: int = 3, delay_seconds: float = 0.15):
+    """Best-effort delete for temporary files, tolerant to transient Windows locks."""
+    for attempt in range(retries):
+        try:
+            path.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            if attempt == retries - 1:
+                app.logger.warning("Could not delete temporary file (locked): %s", path)
+                return
+            time.sleep(delay_seconds)
 
 
 def _clean_fields(fields: list, require_nonempty_labels: bool = True) -> tuple[list, str | None]:
@@ -147,7 +161,7 @@ def upload():
         app.logger.exception("Processing failed")
         return jsonify({"error": f"Processing failed: {str(e)}"}), 500
     finally:
-        upload_path.unlink(missing_ok=True)
+        _safe_unlink(upload_path)
 
 
 @app.route("/build", methods=["POST"])
@@ -208,7 +222,33 @@ def build_from_layout():
         app.logger.exception("Layout build failed")
         return jsonify({"error": f"PDF conversion failed: {str(e)}"}), 500
     finally:
-        upload_path.unlink(missing_ok=True)
+        _safe_unlink(upload_path)
+
+
+@app.route("/inspect-layout", methods=["POST"])
+def inspect_layout():
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided."}), 400
+
+    f = request.files["file"]
+    if not f.filename or not _allowed(f.filename):
+        return jsonify({"error": "Please upload a valid PDF file."}), 400
+
+    unique_name = f"{uuid.uuid4().hex}_{secure_filename(f.filename)}"
+    upload_path = UPLOAD_DIR / unique_name
+    f.save(str(upload_path))
+
+    try:
+        fields = extract_existing_fillable_fields(str(upload_path))
+        return jsonify({
+            "field_count": len(fields),
+            "fields": fields,
+        })
+    except Exception as e:
+        app.logger.exception("Layout inspection failed")
+        return jsonify({"error": f"PDF inspection failed: {str(e)}"}), 500
+    finally:
+        _safe_unlink(upload_path)
 
 
 @app.route("/create-sign-session", methods=["POST"])
@@ -246,7 +286,7 @@ def create_signing_session_route():
         app.logger.exception("Create sign session failed")
         return jsonify({"error": f"Could not create signing session: {str(e)}"}), 500
     finally:
-        upload_path.unlink(missing_ok=True)
+        _safe_unlink(upload_path)
 
 
 @app.route("/sign/<session_id>")

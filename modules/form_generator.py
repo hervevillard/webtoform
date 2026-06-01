@@ -9,6 +9,7 @@ from reportlab.lib.pagesizes import LETTER
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 from reportlab.pdfgen import canvas
+import fitz
 
 # ── Layout constants ────────────────────────────────────────────────────────
 MARGIN_X        = 0.70 * inch
@@ -167,12 +168,9 @@ def _render_text(pm: PageManager, label: str, required: bool,
     pm.y = field_y - GAP_AFTER_FIELD
 
 
-def _render_signature(pm: PageManager, label: str, required: bool, field_name: str):
-    """Render a signature capture area with a text fallback widget.
-
-    ReportLab does not expose a reliable creator for true PDF signature widgets,
-    so we render a clearly-labelled signature area plus a text field fallback.
-    """
+def _render_signature(pm: PageManager, label: str, required: bool,
+                      field_name: str, signature_widgets: list[dict]):
+    """Render a signature area and queue a true PDF signature widget."""
     needed = GAP_LABEL + TEXT_H + GAP_AFTER_FIELD + 0.22 * inch + LABEL_SIZE / 72 * inch
     pm.ensure(needed)
 
@@ -185,17 +183,21 @@ def _render_signature(pm: PageManager, label: str, required: bool, field_name: s
     pm.c.drawString(MARGIN_X, hint_y, "Sign here (type full legal name if digital signature tool is unavailable).")
 
     field_y = hint_y - 0.06 * inch - TEXT_H
-    pm.c.acroForm.textfield(
-        name=field_name,
-        tooltip=label,
-        x=MARGIN_X, y=field_y,
-        width=FIELD_W, height=TEXT_H,
-        borderColor=COL_FIELD_BORD,
-        fillColor=COL_FIELD_BG,
-        textColor=colors.HexColor("#1C1C2E"),
-        borderWidth=1,
-        fontSize=BODY_SIZE,
-        fontName=BODY_FONT,
+    pm.c.setFillColor(COL_FIELD_BG)
+    pm.c.setStrokeColor(COL_FIELD_BORD)
+    pm.c.setLineWidth(1)
+    pm.c.rect(MARGIN_X, field_y, FIELD_W, TEXT_H, fill=1, stroke=1)
+
+    signature_widgets.append(
+        {
+            "page": pm.page_num,
+            "name": field_name,
+            "label": label,
+            "x": MARGIN_X,
+            "y": field_y,
+            "width": FIELD_W,
+            "height": TEXT_H,
+        }
     )
 
     # Visual underline cue for print-sign workflows.
@@ -203,6 +205,40 @@ def _render_signature(pm: PageManager, label: str, required: bool, field_name: s
     pm.c.setLineWidth(0.6)
     pm.c.line(MARGIN_X, field_y - 0.03 * inch, MARGIN_X + FIELD_W, field_y - 0.03 * inch)
     pm.y = field_y - GAP_AFTER_FIELD - 0.05 * inch
+
+
+def _inject_signature_widgets(output_path: str, signature_widgets: list[dict]):
+    """Add native /Sig AcroForm fields after ReportLab writes the PDF."""
+    if not signature_widgets:
+        return
+
+    doc = fitz.open(output_path)
+    try:
+        for sig in signature_widgets:
+            page = doc[sig["page"] - 1]
+            widget = fitz.Widget()
+            widget.field_name = sig["name"]
+            widget.field_label = sig["label"]
+            widget.field_type = fitz.PDF_WIDGET_TYPE_SIGNATURE
+            widget.rect = fitz.Rect(
+                sig["x"],
+                PAGE_H - (sig["y"] + sig["height"]),
+                sig["x"] + sig["width"],
+                PAGE_H - sig["y"],
+            )
+            widget.border_width = 1
+            widget.border_style = "S"
+            widget.border_color = (0.6, 0.5, 0.2)
+            widget.fill_color = (1.0, 0.99, 0.97)
+            widget.text_color = (0.1, 0.1, 0.2)
+            page.add_widget(widget)
+
+        tmp_output = output_path + ".tmp"
+        doc.save(tmp_output, garbage=4, deflate=True)
+    finally:
+        doc.close()
+
+    os.replace(tmp_output, output_path)
 
 
 def _render_checkbox(pm: PageManager, label: str, required: bool, field_name: str):
@@ -316,6 +352,7 @@ def create_fillable_pdf(fields: list[dict], output_path: str,
     c.setAuthor("WebToForm — AI Insurance Form Generator")
 
     pm = PageManager(c, title)
+    signature_widgets: list[dict] = []
 
     today_str = _date.today().strftime("%m / %d / %Y")
 
@@ -339,7 +376,7 @@ def create_fillable_pdf(fields: list[dict], output_path: str,
         elif ftype == "list":
             _render_list(pm, display, required, fname)
         elif ftype == "signature":
-            _render_signature(pm, display, required, fname)
+            _render_signature(pm, display, required, fname, signature_widgets)
         elif ftype == "date":
             _render_text(pm, display, required, fname, multiline=False,
                          default_value=today_str)
@@ -355,3 +392,4 @@ def create_fillable_pdf(fields: list[dict], output_path: str,
 
     pm.finish()
     c.save()
+    _inject_signature_widgets(output_path, signature_widgets)

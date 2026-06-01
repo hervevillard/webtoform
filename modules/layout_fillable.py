@@ -60,8 +60,53 @@ def _clean_fields(raw_fields: list, page_count: int) -> list[dict]:
     return cleaned
 
 
+def _field_type_from_widget(widget) -> str:
+    if widget.field_type == fitz.PDF_WIDGET_TYPE_CHECKBOX:
+        return "checkbox"
+    if widget.field_type == fitz.PDF_WIDGET_TYPE_SIGNATURE:
+        return "signature"
+    return "text"
+
+
+def extract_existing_fillable_fields(input_path: str) -> list[dict]:
+    """Read existing AcroForm widgets from a PDF and return normalized field rectangles."""
+    doc = fitz.open(input_path)
+    try:
+        fields: list[dict] = []
+        for page_index in range(doc.page_count):
+            page = doc[page_index]
+            page_rect = page.rect
+            widgets = list(page.widgets() or [])
+            for w in widgets:
+                rect = w.rect
+                field_flags = int(getattr(w, "field_flags", 0) or 0)
+                fields.append(
+                    {
+                        "page": page_index + 1,
+                        "x": round(float(rect.x0), 2),
+                        "y": round(float(page_rect.height - rect.y1), 2),
+                        "width": round(float(rect.width), 2),
+                        "height": round(float(rect.height), 2),
+                        "label": (getattr(w, "field_label", None) or getattr(w, "field_name", "") or "").strip(),
+                        "type": _field_type_from_widget(w),
+                        "required": bool(field_flags & 2),
+                    }
+                )
+        return fields
+    finally:
+        doc.close()
+
+
+def _clear_existing_widgets(doc) -> None:
+    for page_index in range(doc.page_count):
+        page = doc[page_index]
+        widgets = list(page.widgets() or [])
+        for w in widgets:
+            page.delete_widget(w)
+
+
 def add_fillable_fields_to_existing_pdf(input_path: str, output_path: str, fields: list) -> list[dict]:
-    """Add AcroForm widgets to an existing PDF and return normalized fields."""
+    """Replace all AcroForm widgets in a PDF with the provided normalized fields."""
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
 
     doc = fitz.open(input_path)
@@ -69,6 +114,8 @@ def add_fillable_fields_to_existing_pdf(input_path: str, output_path: str, field
         normalized = _clean_fields(fields, doc.page_count)
         if not normalized:
             raise ValueError("No valid field areas were provided.")
+
+        _clear_existing_widgets(doc)
 
         for i, field in enumerate(normalized):
             page = doc[field["page"] - 1]
@@ -92,16 +139,13 @@ def add_fillable_fields_to_existing_pdf(input_path: str, output_path: str, field
             widget.border_color = (0.6, 0.5, 0.2)
             widget.fill_color = None
             widget.text_color = (0.1, 0.1, 0.2)
+            widget.field_flags = 2 if field["required"] else 0
 
             if field["type"] == "checkbox":
                 widget.field_type = fitz.PDF_WIDGET_TYPE_CHECKBOX
                 widget.field_value = "Off"
             elif field["type"] == "signature":
-                # Many PDF viewers only show a "Sign" badge for signature widgets
-                # and do not provide a full signing flow. Use a reliable text fallback.
-                widget.field_type = fitz.PDF_WIDGET_TYPE_TEXT
-                widget.text_font = "Helv"
-                widget.text_fontsize = 10
+                widget.field_type = fitz.PDF_WIDGET_TYPE_SIGNATURE
             else:
                 widget.field_type = fitz.PDF_WIDGET_TYPE_TEXT
                 widget.text_font = "Helv"

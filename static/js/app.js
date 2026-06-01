@@ -80,19 +80,80 @@
       const li = document.createElement("li");
       li.className = "visual-field-row";
       const labelText = f.label ? escHtml(f.label) : "(no label)";
+      const sourceText = f.source === "existing" ? " · existing" : " · new";
       li.innerHTML = `
-        <span class="visual-field-meta">P${f.page} · ${labelText} · ${f.type}${f.required ? " · required" : ""}</span>
+        <span class="visual-field-meta">P${f.page} · ${labelText} · ${f.type}${f.required ? " · required" : ""}${sourceText}</span>
         <button type="button" class="btn-danger-ghost" title="Remove">&#10005;</button>`;
+      li.addEventListener("click", (event) => {
+        if (event.target.closest("button")) return;
+        visualSelectedFieldId = f.id;
+        syncVisualFieldInputsFromSelection();
+        renderVisualOverlay();
+      });
       li.querySelector("button").addEventListener("click", () => {
         visualFields = visualFields.filter(x => x.id !== f.id);
         if (visualSelectedFieldId === f.id) {
           visualSelectedFieldId = null;
         }
+        syncVisualFieldInputsFromSelection();
         updateVisualFieldState();
         renderVisualOverlay();
       });
       visualFieldList.appendChild(li);
     });
+  }
+
+  function getSelectedVisualField() {
+    if (!visualSelectedFieldId) return null;
+    return visualFields.find(f => f.id === visualSelectedFieldId) || null;
+  }
+
+  function syncVisualFieldInputsFromSelection() {
+    const selected = getSelectedVisualField();
+    if (!selected) {
+      if (visualFieldLabel) visualFieldLabel.value = "";
+      if (visualFieldType) visualFieldType.value = "text";
+      if (visualFieldRequired) visualFieldRequired.checked = false;
+      return;
+    }
+
+    if (visualFieldLabel) visualFieldLabel.value = selected.label || "";
+    if (visualFieldType) visualFieldType.value = selected.type === "signature" ? "signature" : "text";
+    if (visualFieldRequired) visualFieldRequired.checked = !!selected.required;
+  }
+
+  async function inspectVisualExistingFields(file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/inspect-layout", { method: "POST", body: formData });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Could not inspect existing fields.");
+    }
+
+    return Array.isArray(data.fields) ? data.fields : [];
+  }
+
+  async function loadVisualExistingFields(file) {
+    const existing = await inspectVisualExistingFields(file);
+    visualFields = existing.map((f) => ({
+      id: ++visualFieldSeq,
+      page: Number(f.page) || 1,
+      x: Number(f.x) || 0,
+      y: Number(f.y) || 0,
+      width: Number(f.width) || 0,
+      height: Number(f.height) || 0,
+      label: String(f.label || ""),
+      type: f.type === "signature" ? "signature" : "text",
+      required: !!f.required,
+      source: "existing",
+    }));
+    visualSelectedFieldId = null;
+    syncVisualFieldInputsFromSelection();
+    updateVisualFieldState();
+    renderVisualOverlay();
+    return existing.length;
   }
 
   function resetVisualEditor() {
@@ -112,6 +173,7 @@
     visualOverlay.style.height = "0px";
     updateVisualFieldState();
     updateVisualNavState();
+    syncVisualFieldInputsFromSelection();
   }
 
   async function loadVisualPdf(file) {
@@ -192,6 +254,7 @@
       box.addEventListener("click", (event) => {
         event.stopPropagation();
         visualSelectedFieldId = field.id;
+        syncVisualFieldInputsFromSelection();
         renderVisualOverlay();
       });
 
@@ -202,6 +265,7 @@
         if (visualSelectedFieldId === field.id) {
           visualSelectedFieldId = null;
         }
+        syncVisualFieldInputsFromSelection();
         updateVisualFieldState();
         renderVisualOverlay();
       });
@@ -211,6 +275,7 @@
         if (visualSelectedFieldId === field.id) {
           visualSelectedFieldId = null;
         }
+        syncVisualFieldInputsFromSelection();
         updateVisualFieldState();
         renderVisualOverlay();
       });
@@ -231,8 +296,13 @@
 
     resetVisualEditor();
     loadVisualPdf(file)
-      .then(() => {
-        showStatus(visualStatusArea, "&#10003; PDF loaded. Drag on the preview to place fields.", "success");
+      .then(async () => {
+        const existingCount = await loadVisualExistingFields(file);
+        if (existingCount > 0) {
+          showStatus(visualStatusArea, `&#10003; PDF loaded. Found ${existingCount} existing fillable field${existingCount !== 1 ? "s" : ""}. Click a field to edit label/type/required, move, resize, or delete.`, "success");
+        } else {
+          showStatus(visualStatusArea, "&#10003; PDF loaded. No existing fillable fields found. Drag on the preview to place fields.", "success");
+        }
       })
       .catch((err) => {
         const msg = err && err.message ? `Could not open this PDF in the visual editor: ${err.message}` : "Could not open this PDF in the visual editor.";
@@ -369,6 +439,7 @@
     }
 
     visualSelectedFieldId = null;
+    syncVisualFieldInputsFromSelection();
     renderVisualOverlay();
 
     const start = getOverlayPoint(event);
@@ -462,8 +533,11 @@
       label: fieldLabel,
       type,
       required: visualFieldRequired.checked,
+      source: "new",
     });
 
+    visualSelectedFieldId = visualFieldSeq;
+    syncVisualFieldInputsFromSelection();
     updateVisualFieldState();
     renderVisualOverlay();
   }
@@ -502,9 +576,34 @@
       if (typingInInput) return;
       visualFields = visualFields.filter(f => f.id !== visualSelectedFieldId);
       visualSelectedFieldId = null;
+      syncVisualFieldInputsFromSelection();
       updateVisualFieldState();
       renderVisualOverlay();
     }
+  });
+
+  visualFieldLabel.addEventListener("input", () => {
+    const selected = getSelectedVisualField();
+    if (!selected) return;
+    selected.label = visualFieldLabel.value;
+    updateVisualFieldState();
+    renderVisualOverlay();
+  });
+
+  visualFieldType.addEventListener("change", () => {
+    const selected = getSelectedVisualField();
+    if (!selected) return;
+    selected.type = visualFieldType.value === "signature" ? "signature" : "text";
+    updateVisualFieldState();
+    renderVisualOverlay();
+  });
+
+  visualFieldRequired.addEventListener("change", () => {
+    const selected = getSelectedVisualField();
+    if (!selected) return;
+    selected.required = !!visualFieldRequired.checked;
+    updateVisualFieldState();
+    renderVisualOverlay();
   });
 
   window.addEventListener("resize", () => {
@@ -541,7 +640,7 @@
       }
       const hasSignature = visualFields.some(f => f.type === "signature");
       const successMsg = hasSignature
-        ? `&#10003; Done — ${data.field_count} fields added. Downloading… Open in Adobe Acrobat Reader for full signature experience.`
+        ? `&#10003; Done — ${data.field_count} fields added. Downloading… Signature fields are native PDF widgets; use Adobe Acrobat Reader for best signing compatibility.`
         : `&#10003; Done — ${data.field_count} fields added. Downloading…`;
       showStatus(visualStatusArea, successMsg, "success");
       window.location.href = data.download_url;
@@ -596,6 +695,7 @@
 
   updateVisualFieldState();
   updateVisualNavState();
+  syncVisualFieldInputsFromSelection();
 
   // ════════════════════════════════════════════════════════
   // STEP INDICATOR (AI tab)

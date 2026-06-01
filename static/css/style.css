@@ -961,6 +961,11 @@ footer span { color: var(--gold); font-weight: 600; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: .5rem .6rem;
+  cursor: pointer;
+}
+
+.visual-field-row:hover {
+  border-color: var(--gold);
 }
 
 .visual-field-meta {

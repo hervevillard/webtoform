@@ -127,7 +127,7 @@ Check the terminal window for error details. The most common cause is a placehol
 ## Limitations
 
 - Scanned / image-only PDFs are not supported (no OCR built in)
-- Generated forms are printable but not AcroForm-interactive (no JavaScript form validation)
+- Generated forms are AcroForm-interactive; native signature widgets work best in compatible viewers (for example, Adobe Acrobat Reader)
 - Uploaded files and generated forms are not stored permanently; download promptly
 
 ---

@@ -21,7 +21,7 @@ webtoform/
 │   ├── pdf_reader.py       # Extract text/structure from PDF
 │   ├── deepseek_client.py  # Calls DeepSeek API, returns form field list
 │   ├── form_generator.py   # Builds fillable PDF from field list
-│   └── layout_fillable.py  # Adds fillable widgets on top of existing PDF layout
+│   └── layout_fillable.py  # Reads/rebuilds AcroForm widgets on existing PDF layouts
 ├── templates/
 │   └── index.html          # Single-page UI
 ├── static/
@@ -133,7 +133,8 @@ After any of the following, update the relevant section of `CLAUDE.md` before cl
 | GET | `/api-key-status` | Returns `{key_set: bool}` |
 | POST | `/set-api-key` | Accepts `{api_key}`, sets env + persists to `.env` |
 | POST | `/build` | Accepts `{title, fields}` JSON, generates PDF without AI, returns same shape as `/upload` |
-| POST | `/build-from-layout` | Accepts uploaded PDF + visual field coordinates, injects AcroForm fields into original layout |
+| POST | `/build-from-layout` | Accepts uploaded PDF + visual field coordinates, replaces AcroForm widget set with edited layout |
+| POST | `/inspect-layout` | Accepts uploaded PDF, returns detected existing AcroForm fields for visual editing |
 | POST | `/create-sign-session` | Accepts uploaded PDF + visual field coordinates, returns a shareable web signing URL |
 | GET | `/sign/<id>` | Renders a signer page with text inputs + draw signature pads |
 | POST | `/sign/<id>/submit` | Accepts signer values/signatures, embeds them into PDF, returns download page |
@@ -146,7 +147,7 @@ After any of the following, update the relevant section of `CLAUDE.md` before cl
 | Type | Rendered as |
 |---|---|
 | `text` | Single-line AcroForm textfield |
-| `signature` | Reliable fillable signature fallback field in generated PDFs; for drawn e-sign capture use web signing flow |
+| `signature` | Native PDF signature widget (`/Sig`) for local signing in compatible PDF viewers |
 | `textarea` | Multi-line AcroForm textfield |
 | `date` | Single-line textfield with `(MM / DD / YYYY)` hint |
 | `email` | Single-line textfield with email hint |
@@ -154,7 +155,7 @@ After any of the following, update the relevant section of `CLAUDE.md` before cl
 | `checkbox` | AcroForm checkbox widget |
 | `list` | Section header + 5 numbered AcroForm textfield rows |
 
-**Visual Fillable note:** Visual placement mode supports `text` and `signature` field types, and generated PDFs use a reliable fillable signature fallback.
+**Visual Fillable note:** Visual placement mode supports `text` and `signature` field types, auto-detects existing AcroForm fields from uploaded PDFs, and lets agents move/resize/delete/rename/edit required/type before rebuilding the final widget set. Generated PDFs use native PDF signature widgets (`/Sig`) for local signing in compatible viewers.
 Use **Create Web Sign Link** when you need DocuSign-style drawn signatures captured in-browser and embedded into the final PDF.
 
 **Note on date popup:** True calendar date-picker in PDF requires Adobe Acrobat JavaScript, which ReportLab's public canvas API does not expose. Date fields use a clearly-labelled text input as the best available cross-viewer alternative.

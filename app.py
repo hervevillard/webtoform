@@ -2,6 +2,7 @@ import os
 import re
 import socket
 import uuid
+import json
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
@@ -13,6 +14,7 @@ load_dotenv()
 from modules.pdf_reader import extract_text
 from modules.deepseek_client import analyze_document
 from modules.form_generator import create_fillable_pdf
+from modules.layout_fillable import add_fillable_fields_to_existing_pdf
 from modules.store import create_form, get_form, add_submission, list_forms
 
 app = Flask(__name__)
@@ -169,6 +171,45 @@ def build():
         return jsonify({"error": f"PDF generation failed: {str(e)}"}), 500
 
 
+@app.route("/build-from-layout", methods=["POST"])
+def build_from_layout():
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided."}), 400
+
+    f = request.files["file"]
+    if not f.filename or not _allowed(f.filename):
+        return jsonify({"error": "Please upload a valid PDF file."}), 400
+
+    raw_fields = request.form.get("fields", "[]")
+    try:
+        fields = json.loads(raw_fields)
+    except json.JSONDecodeError:
+        return jsonify({"error": "Invalid field layout payload."}), 400
+
+    unique_name = f"{uuid.uuid4().hex}_{secure_filename(f.filename)}"
+    upload_path = UPLOAD_DIR / unique_name
+    f.save(str(upload_path))
+
+    try:
+        out_filename = f"fillable_{uuid.uuid4().hex[:8]}.pdf"
+        out_path = OUTPUT_DIR / out_filename
+        normalized = add_fillable_fields_to_existing_pdf(str(upload_path), str(out_path), fields)
+
+        return jsonify({
+            "download_url": f"/download/{out_filename}",
+            "filename": out_filename,
+            "field_count": len(normalized),
+            "fields": normalized,
+        })
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        app.logger.exception("Layout build failed")
+        return jsonify({"error": f"PDF conversion failed: {str(e)}"}), 500
+    finally:
+        upload_path.unlink(missing_ok=True)
+
+
 @app.route("/share", methods=["POST"])
 def share():
     data   = request.get_json(silent=True) or {}
@@ -178,7 +219,7 @@ def share():
         return jsonify({"error": err}), 400
 
     form_id   = create_form(title, cleaned)
-    port      = int(os.environ.get("PORT", 5000))
+    port      = int(os.environ.get("PORT", 8686))
     lan_ip    = _get_lan_ip()
     share_url = f"http://{lan_ip}:{port}/form/{form_id}"
 
@@ -246,7 +287,7 @@ def download(filename: str):
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8686))
     lan  = _get_lan_ip()
     print(f"\n  WebToForm running at:")
     print(f"    Local:   http://localhost:{port}")

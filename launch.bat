@@ -61,10 +61,12 @@ echo  Starting WebToForm server...
 echo.
 
 :: Read PORT from .env if set
+set APP_PORT=
 for /f "tokens=1,2 delims==" %%a in (.env) do (
     if "%%a"=="PORT" set APP_PORT=%%b
 )
-if not defined APP_PORT set APP_PORT=5000
+if not defined APP_PORT set APP_PORT=8686
+set "PORT=%APP_PORT%"
 
 :: Open browser after a short delay (runs in background)
 start /b cmd /c "timeout /t 2 >nul && start http://localhost:%APP_PORT%"

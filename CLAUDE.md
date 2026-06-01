@@ -20,12 +20,14 @@ webtoform/
 ├── modules/
 │   ├── pdf_reader.py       # Extract text/structure from PDF
 │   ├── deepseek_client.py  # Calls DeepSeek API, returns form field list
-│   └── form_generator.py   # Builds fillable PDF from field list
+│   ├── form_generator.py   # Builds fillable PDF from field list
+│   └── layout_fillable.py  # Adds fillable widgets on top of existing PDF layout
 ├── templates/
 │   └── index.html          # Single-page UI
 ├── static/
 │   ├── css/style.css
-│   └── js/app.js
+│   ├── js/app.js
+│   └── vendor/pdfjs/       # Locally pinned PDF.js runtime + worker
 ├── uploads/                # Temporary storage for uploaded PDFs (gitignored)
 ├── output/                 # Generated fillable PDFs (gitignored)
 ├── .claude/skills/         # Agent skill files
@@ -64,7 +66,7 @@ Double-click `launch.bat` on Windows. It will:
 1. Create a Python virtual environment if one doesn't exist
 2. Install all dependencies from `requirements.txt`
 3. Copy `.env.example` → `.env` if `.env` doesn't exist (user must fill in API key)
-4. Start the Flask dev server on `http://localhost:5000`
+4. Start the Flask dev server on `http://localhost:8686`
 5. Open the browser automatically
 
 ## Development Notes
@@ -72,6 +74,7 @@ Double-click `launch.bat` on Windows. It will:
 - Uploaded PDFs and generated forms are not persisted long-term; clean `uploads/` and `output/` periodically
 - The DeepSeek prompt is in `modules/deepseek_client.py` — tune it there
 - Form layout is defined in `modules/form_generator.py` — tweak fonts, spacing, header there
+- Visual PDF rendering uses local `static/vendor/pdfjs/*` files to avoid CDN/worker mismatch issues
 - API key can be entered directly in the UI; it is persisted to `.env` via `POST /set-api-key`
 - The app launches without a pre-configured API key — `launch.bat` never blocks on missing key
 
@@ -130,6 +133,7 @@ After any of the following, update the relevant section of `CLAUDE.md` before cl
 | GET | `/api-key-status` | Returns `{key_set: bool}` |
 | POST | `/set-api-key` | Accepts `{api_key}`, sets env + persists to `.env` |
 | POST | `/build` | Accepts `{title, fields}` JSON, generates PDF without AI, returns same shape as `/upload` |
+| POST | `/build-from-layout` | Accepts uploaded PDF + visual field coordinates, injects AcroForm fields into original layout |
 | POST | `/share` | Accepts `{title, fields}`, stores form in `data/forms.json`, returns `{form_id, share_url, field_count}` |
 | GET | `/form/<id>` | Renders customer-facing web form (`templates/form.html`) |
 | POST | `/form/<id>/submit` | Saves customer submission to `data/forms.json`, shows thank-you page |

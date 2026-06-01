@@ -14,6 +14,389 @@
   tabBtns.forEach(b => b.addEventListener("click", () => switchTab(b.dataset.tab)));
 
   // ════════════════════════════════════════════════════════
+  // VISUAL FILLABLE TAB
+  // ════════════════════════════════════════════════════════
+  const visualDropZone      = document.getElementById("visual-drop-zone");
+  const visualFileInput     = document.getElementById("visual-file-input");
+  const visualFileName      = document.getElementById("visual-file-name");
+  const visualPrevPageBtn   = document.getElementById("visual-prev-page");
+  const visualNextPageBtn   = document.getElementById("visual-next-page");
+  const visualPageLabel     = document.getElementById("visual-page-label");
+  const visualFieldLabel    = document.getElementById("visual-field-label");
+  const visualFieldType     = document.getElementById("visual-field-type");
+  const visualFieldRequired = document.getElementById("visual-field-required");
+  const visualCanvas        = document.getElementById("visual-pdf-canvas");
+  const visualOverlay       = document.getElementById("visual-overlay");
+  const visualFieldList     = document.getElementById("visual-field-list");
+  const visualFieldCount    = document.getElementById("visual-field-count");
+  const visualClearPageBtn  = document.getElementById("visual-clear-page");
+  const visualClearAllBtn   = document.getElementById("visual-clear-all");
+  const visualGenerateBtn   = document.getElementById("visual-generate-btn");
+  const visualStatusArea    = document.getElementById("visual-status-area");
+
+  let visualSelectedFile = null;
+  let visualPdfDoc = null;
+  let visualPageNumber = 1;
+  let visualScale = 1.25;
+  let visualPageWidthPts = 0;
+  let visualPageHeightPts = 0;
+  let visualFields = [];
+  let visualFieldSeq = 0;
+  let drawState = null;
+  const pdfjs = window.pdfjsLib || globalThis.pdfjsLib || null;
+
+  if (pdfjs) {
+    pdfjs.GlobalWorkerOptions.workerSrc =
+      "/static/vendor/pdfjs/pdf.worker.min.js";
+  }
+
+  function updateVisualNavState() {
+    const pages = visualPdfDoc ? visualPdfDoc.numPages : 0;
+    visualPageLabel.textContent = `Page ${pages ? visualPageNumber : 0} / ${pages}`;
+    visualPrevPageBtn.disabled = !visualPdfDoc || visualPageNumber <= 1;
+    visualNextPageBtn.disabled = !visualPdfDoc || visualPageNumber >= pages;
+    visualGenerateBtn.disabled = !visualSelectedFile || visualFields.length === 0;
+  }
+
+  function updateVisualFieldState() {
+    visualFieldCount.textContent = `${visualFields.length} field${visualFields.length !== 1 ? "s" : ""}`;
+    visualGenerateBtn.disabled = !visualSelectedFile || visualFields.length === 0;
+
+    visualFieldList.innerHTML = "";
+    if (visualFields.length === 0) {
+      const li = document.createElement("li");
+      li.className = "visual-empty";
+      li.textContent = "No fields yet. Draw on the PDF preview to place fields.";
+      visualFieldList.appendChild(li);
+      return;
+    }
+
+    visualFields.forEach(f => {
+      const li = document.createElement("li");
+      li.className = "visual-field-row";
+      const labelText = f.label ? escHtml(f.label) : "(no label)";
+      li.innerHTML = `
+        <span class="visual-field-meta">P${f.page} · ${labelText} · ${f.type}${f.required ? " · required" : ""}</span>
+        <button type="button" class="btn-danger-ghost" title="Remove">&#10005;</button>`;
+      li.querySelector("button").addEventListener("click", () => {
+        visualFields = visualFields.filter(x => x.id !== f.id);
+        updateVisualFieldState();
+        renderVisualOverlay();
+      });
+      visualFieldList.appendChild(li);
+    });
+  }
+
+  function resetVisualEditor() {
+    visualPdfDoc = null;
+    visualPageNumber = 1;
+    visualPageWidthPts = 0;
+    visualPageHeightPts = 0;
+    visualFields = [];
+    visualFieldSeq = 0;
+    const ctx = visualCanvas.getContext("2d");
+    ctx.clearRect(0, 0, visualCanvas.width, visualCanvas.height);
+    visualOverlay.innerHTML = "";
+    visualOverlay.style.width = "0px";
+    visualOverlay.style.height = "0px";
+    updateVisualFieldState();
+    updateVisualNavState();
+  }
+
+  async function loadVisualPdf(file) {
+    if (!pdfjs) {
+      showStatus(visualStatusArea, "PDF renderer failed to load. Reload the page and retry.", "error");
+      return;
+    }
+
+    const bytes = await file.arrayBuffer();
+    const options = { data: bytes, stopAtErrors: true };
+
+    try {
+      visualPdfDoc = await pdfjs.getDocument(options).promise;
+    } catch (_) {
+      // Fallback for environments where worker loading is blocked.
+      visualPdfDoc = await pdfjs.getDocument({ ...options, disableWorker: true }).promise;
+    }
+
+    visualPageNumber = 1;
+    await renderVisualPage();
+    updateVisualNavState();
+  }
+
+  async function renderVisualPage() {
+    if (!visualPdfDoc) return;
+    const page = await visualPdfDoc.getPage(visualPageNumber);
+    const viewport = page.getViewport({ scale: visualScale });
+    const viewportOne = page.getViewport({ scale: 1 });
+    visualPageWidthPts = viewportOne.width;
+    visualPageHeightPts = viewportOne.height;
+
+    visualCanvas.width = Math.floor(viewport.width);
+    visualCanvas.height = Math.floor(viewport.height);
+
+    const ctx = visualCanvas.getContext("2d");
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    visualOverlay.style.width = `${visualCanvas.clientWidth}px`;
+    visualOverlay.style.height = `${visualCanvas.clientHeight}px`;
+    renderVisualOverlay();
+    updateVisualNavState();
+  }
+
+  function renderVisualOverlay() {
+    visualOverlay.innerHTML = "";
+    if (!visualPdfDoc || visualPageWidthPts <= 0 || visualPageHeightPts <= 0) return;
+
+    const overlayWidthPx = visualOverlay.clientWidth || visualCanvas.clientWidth;
+    const overlayHeightPx = visualOverlay.clientHeight || visualCanvas.clientHeight;
+    if (!overlayWidthPx || !overlayHeightPx) return;
+
+    const pageFields = visualFields.filter(f => f.page === visualPageNumber);
+    pageFields.forEach(field => {
+      const box = document.createElement("div");
+      box.className = `visual-box ${field.type === "checkbox" ? "checkbox" : "text"}`;
+
+      const left = (field.x / visualPageWidthPts) * overlayWidthPx;
+      const top = ((visualPageHeightPts - (field.y + field.height)) / visualPageHeightPts) * overlayHeightPx;
+      const width = (field.width / visualPageWidthPts) * overlayWidthPx;
+      const height = (field.height / visualPageHeightPts) * overlayHeightPx;
+
+      box.style.left = `${left}px`;
+      box.style.top = `${top}px`;
+      box.style.width = `${width}px`;
+      box.style.height = `${height}px`;
+      box.innerHTML = `<span>${escHtml(field.label)}</span>`;
+
+      box.addEventListener("dblclick", () => {
+        visualFields = visualFields.filter(f => f.id !== field.id);
+        updateVisualFieldState();
+        renderVisualOverlay();
+      });
+
+      visualOverlay.appendChild(box);
+    });
+  }
+
+  function setVisualFile(file) {
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      showStatus(visualStatusArea, "Please select a PDF file.", "error");
+      return;
+    }
+
+    visualSelectedFile = file;
+    visualFileName.innerHTML = `&#128196; <strong>${escHtml(file.name)}</strong> &nbsp;(${formatBytes(file.size)})`;
+    showSpinner(visualStatusArea, "Loading PDF preview…");
+
+    resetVisualEditor();
+    loadVisualPdf(file)
+      .then(() => {
+        showStatus(visualStatusArea, "&#10003; PDF loaded. Drag on the preview to place fields.", "success");
+      })
+      .catch((err) => {
+        const msg = err && err.message ? `Could not open this PDF in the visual editor: ${err.message}` : "Could not open this PDF in the visual editor.";
+        showStatus(visualStatusArea, msg, "error");
+      });
+  }
+
+  visualDropZone.addEventListener("click", () => {
+    visualFileInput.value = "";
+    visualFileInput.click();
+  });
+  visualDropZone.addEventListener("dragover", (e) => { e.preventDefault(); visualDropZone.classList.add("dragover"); });
+  ["dragleave", "dragend"].forEach(ev => visualDropZone.addEventListener(ev, () => visualDropZone.classList.remove("dragover")));
+  visualDropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    visualDropZone.classList.remove("dragover");
+    if (e.dataTransfer.files[0]) setVisualFile(e.dataTransfer.files[0]);
+  });
+  visualFileInput.addEventListener("change", () => {
+    if (visualFileInput.files[0]) setVisualFile(visualFileInput.files[0]);
+  });
+
+  visualPrevPageBtn.addEventListener("click", async () => {
+    if (!visualPdfDoc || visualPageNumber <= 1) return;
+    visualPageNumber -= 1;
+    await renderVisualPage();
+  });
+
+  visualNextPageBtn.addEventListener("click", async () => {
+    if (!visualPdfDoc || visualPageNumber >= visualPdfDoc.numPages) return;
+    visualPageNumber += 1;
+    await renderVisualPage();
+  });
+
+  visualClearPageBtn.addEventListener("click", () => {
+    visualFields = visualFields.filter(f => f.page !== visualPageNumber);
+    updateVisualFieldState();
+    renderVisualOverlay();
+  });
+
+  visualClearAllBtn.addEventListener("click", () => {
+    visualFields = [];
+    updateVisualFieldState();
+    renderVisualOverlay();
+  });
+
+  function getOverlayPoint(event) {
+    const rect = visualOverlay.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, event.clientX - rect.left));
+    const y = Math.max(0, Math.min(rect.height, event.clientY - rect.top));
+    return {
+      x,
+      y,
+    };
+  }
+
+  function promptVisualFieldType(defaultType) {
+    const allowedTypes = ["text", "checkbox"];
+    const fallbackType = allowedTypes.includes(defaultType) ? defaultType : "text";
+
+    while (true) {
+      const choice = window.prompt("Choose field type: text or checkbox", fallbackType);
+      if (choice === null) {
+        showStatus(visualStatusArea, "Field placement cancelled.", "error");
+        return null;
+      }
+
+      const normalized = choice.trim().toLowerCase();
+      if (allowedTypes.includes(normalized)) return normalized;
+
+      showStatus(visualStatusArea, "Use either 'text' or 'checkbox' for field type.", "error");
+    }
+  }
+
+  visualOverlay.addEventListener("mousedown", (event) => {
+    if (!visualPdfDoc) return;
+
+    const start = getOverlayPoint(event);
+    const ghost = document.createElement("div");
+    ghost.className = "visual-box visual-box-drawing";
+    ghost.style.left = `${start.x}px`;
+    ghost.style.top = `${start.y}px`;
+    ghost.style.width = "1px";
+    ghost.style.height = "1px";
+    visualOverlay.appendChild(ghost);
+
+    drawState = { start, ghost };
+  });
+
+  visualOverlay.addEventListener("mousemove", (event) => {
+    if (!drawState) return;
+    const now = getOverlayPoint(event);
+    const x = Math.min(drawState.start.x, now.x);
+    const y = Math.min(drawState.start.y, now.y);
+    const w = Math.abs(now.x - drawState.start.x);
+    const h = Math.abs(now.y - drawState.start.y);
+
+    drawState.ghost.style.left = `${x}px`;
+    drawState.ghost.style.top = `${y}px`;
+    drawState.ghost.style.width = `${w}px`;
+    drawState.ghost.style.height = `${h}px`;
+  });
+
+  function finishDrawing(event) {
+    if (!drawState || !visualPdfDoc) return;
+
+    const end = getOverlayPoint(event);
+    const leftPx = Math.min(drawState.start.x, end.x);
+    const topPx = Math.min(drawState.start.y, end.y);
+    let widthPx = Math.abs(end.x - drawState.start.x);
+    let heightPx = Math.abs(end.y - drawState.start.y);
+
+    drawState.ghost.remove();
+    drawState = null;
+
+    const type = promptVisualFieldType(visualFieldType.value);
+    if (!type) return;
+
+    visualFieldType.value = type;
+
+    if (type === "checkbox") {
+      const side = Math.max(12, Math.min(widthPx || 12, heightPx || 12));
+      widthPx = side;
+      heightPx = side;
+    }
+
+    if (widthPx < 8 || heightPx < 8) return;
+
+    const overlayWidthPx = visualOverlay.clientWidth;
+    const overlayHeightPx = visualOverlay.clientHeight;
+    if (!overlayWidthPx || !overlayHeightPx || !visualPageWidthPts || !visualPageHeightPts) return;
+
+    const xPts = (leftPx / overlayWidthPx) * visualPageWidthPts;
+    const yPts = visualPageHeightPts - (((topPx + heightPx) / overlayHeightPx) * visualPageHeightPts);
+    const wPts = (widthPx / overlayWidthPx) * visualPageWidthPts;
+    const hPts = (heightPx / overlayHeightPx) * visualPageHeightPts;
+
+    const fieldLabel = visualFieldLabel.value.trim();
+
+    visualFields.push({
+      id: ++visualFieldSeq,
+      page: visualPageNumber,
+      x: Number(xPts.toFixed(2)),
+      y: Number(yPts.toFixed(2)),
+      width: Number(wPts.toFixed(2)),
+      height: Number(hPts.toFixed(2)),
+      label: fieldLabel,
+      type,
+      required: visualFieldRequired.checked,
+    });
+
+    updateVisualFieldState();
+    renderVisualOverlay();
+  }
+
+  visualOverlay.addEventListener("mouseup", finishDrawing);
+  visualOverlay.addEventListener("mouseleave", (event) => {
+    if (!drawState) return;
+    finishDrawing(event);
+  });
+
+  window.addEventListener("resize", () => {
+    if (!visualPdfDoc) return;
+    visualOverlay.style.width = `${visualCanvas.clientWidth}px`;
+    visualOverlay.style.height = `${visualCanvas.clientHeight}px`;
+    renderVisualOverlay();
+  });
+
+  visualGenerateBtn.addEventListener("click", async () => {
+    if (!visualSelectedFile) {
+      showStatus(visualStatusArea, "Please upload a PDF first.", "error");
+      return;
+    }
+    if (visualFields.length === 0) {
+      showStatus(visualStatusArea, "Draw at least one field area before generating.", "error");
+      return;
+    }
+
+    visualGenerateBtn.disabled = true;
+    showSpinner(visualStatusArea, "Creating fillable PDF from your visual layout…");
+
+    const formData = new FormData();
+    formData.append("file", visualSelectedFile);
+    formData.append("fields", JSON.stringify(visualFields.map(({ id, ...f }) => f)));
+
+    try {
+      const res = await fetch("/build-from-layout", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        showStatus(visualStatusArea, data.error || "Conversion failed.", "error");
+        visualGenerateBtn.disabled = false;
+        return;
+      }
+      showStatus(visualStatusArea, `&#10003; Done — ${data.field_count} fields added. Downloading…`, "success");
+      window.location.href = data.download_url;
+    } catch (_) {
+      showStatus(visualStatusArea, "Network error — is the server running?", "error");
+    }
+
+    visualGenerateBtn.disabled = false;
+  });
+
+  updateVisualFieldState();
+  updateVisualNavState();
+
+  // ════════════════════════════════════════════════════════
   // STEP INDICATOR (AI tab)
   // ════════════════════════════════════════════════════════
   const steps = [
@@ -134,7 +517,10 @@
   dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("dragover"); });
   ["dragleave","dragend"].forEach(ev => dropZone.addEventListener(ev, () => dropZone.classList.remove("dragover")));
   dropZone.addEventListener("drop", (e) => { e.preventDefault(); dropZone.classList.remove("dragover"); if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]); });
-  dropZone.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("click", () => {
+    fileInput.value = "";
+    fileInput.click();
+  });
   fileInput.addEventListener("change", () => { if (fileInput.files[0]) setFile(fileInput.files[0]); });
 
   function setFile(file) {

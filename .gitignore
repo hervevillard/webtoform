@@ -8,3 +8,4 @@ data/forms.json
 *.egg-info/
 dist/
 .DS_Store
+.vscode/

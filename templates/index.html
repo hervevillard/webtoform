@@ -64,6 +64,7 @@
 
 <!-- ── Tab bar ────────────────────────────────────────────── -->
 <div class="tab-bar">
+  <button class="tab-btn" data-tab="visual">&#128065; Visual Fillable</button>
   <button class="tab-btn active" data-tab="ai">&#9889; AI Generate</button>
   <button class="tab-btn" data-tab="manual">&#9998; Manual Builder</button>
   <button class="tab-btn" data-tab="share">&#128279; Share Form</button>
@@ -72,6 +73,62 @@
 
 <!-- ── Main ───────────────────────────────────────────────── -->
 <main>
+
+  <!-- ════════════════════════════════════════════════════
+       TAB: Visual Fillable
+  ════════════════════════════════════════════════════ -->
+  <div id="tab-visual" class="tab-panel">
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128065;</span> Make Existing PDF Fillable (Visual)</div>
+      <p class="card-desc">Upload your non-fillable PDF, view it directly on screen, draw areas where customers should type, then download the same PDF with interactive fields added in-place.</p>
+
+      <div id="visual-drop-zone" class="visual-drop-zone">
+        <span class="dz-icon">&#128196;</span>
+        <div class="dz-label">Choose a PDF to edit visually</div>
+        <div class="dz-sub">Draw boxes exactly where you want fillable areas</div>
+        <input type="file" id="visual-file-input" accept=".pdf" />
+      </div>
+      <div id="visual-file-name"></div>
+
+      <div class="visual-controls">
+        <button class="btn btn-ghost" id="visual-prev-page" type="button">&#8592; Prev</button>
+        <span id="visual-page-label" class="visual-page-label">Page 0 / 0</span>
+        <button class="btn btn-ghost" id="visual-next-page" type="button">Next &#8594;</button>
+      </div>
+
+      <div class="visual-controls">
+        <input type="text" id="visual-field-label" class="builder-title-input" placeholder="Optional field label (e.g. Insured Name)" />
+        <select id="visual-field-type" class="builder-type-select">
+          <option value="text">text</option>
+          <option value="checkbox">checkbox</option>
+        </select>
+        <label class="req-toggle-wrap" title="Required">
+          <input type="checkbox" id="visual-field-required" />
+          <span class="req-label">Req.</span>
+        </label>
+      </div>
+
+      <p class="card-desc" style="margin-bottom:.7rem;">Click and drag on the PDF preview to place a field, then choose its type when you release.</p>
+      <div class="visual-canvas-wrap" id="visual-canvas-wrap">
+        <canvas id="visual-pdf-canvas"></canvas>
+        <div id="visual-overlay" class="visual-overlay"></div>
+      </div>
+
+      <div class="builder-header" style="margin-top:1rem;">
+        <span class="builder-section-label" style="margin:0;">Placed Fields</span>
+        <span class="builder-count" id="visual-field-count">0 fields</span>
+      </div>
+      <ul id="visual-field-list"></ul>
+
+      <div class="builder-actions">
+        <button class="btn btn-ghost" id="visual-clear-page" type="button">Clear Current Page</button>
+        <button class="btn btn-ghost" id="visual-clear-all" type="button">Clear All</button>
+        <button class="btn btn-success" id="visual-generate-btn" type="button">Generate Fillable PDF</button>
+      </div>
+
+      <div id="visual-status-area"></div>
+    </div>
+  </div><!-- /tab-visual -->
 
   <!-- ════════════════════════════════════════════════════
        TAB: AI Generate
@@ -255,6 +312,7 @@
   &nbsp;&nbsp;|&nbsp;&nbsp; Built by <span>Herve</span>
 </footer>
 
+<script src="/static/vendor/pdfjs/pdf.min.js"></script>
 <script src="/static/js/app.js"></script>
 </body>
 </html>

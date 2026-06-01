@@ -39,7 +39,7 @@ Double-click **`launch.bat`**.
 On first run it will:
 - Create a Python virtual environment
 - Install all dependencies automatically
-- Open the browser at `http://localhost:5000`
+- Open the browser at `http://localhost:8686`
 
 ### 3. Enter your API key in the UI
 
@@ -116,7 +116,7 @@ Open `.env` and make sure your key is on the line `DEEPSEEK_API_KEY=sk-...` with
 **"Could not extract text from this PDF"**
 The PDF is likely a scanned image. PyMuPDF can only read text-based PDFs. Run the document through an OCR tool first (e.g. Adobe Acrobat, Microsoft Lens).
 
-**Port 5000 is already in use**
+**Port 8686 is already in use**
 Add `PORT=5001` (or any free port) to your `.env` file and relaunch.
 
 **Blank page or form has no fields**

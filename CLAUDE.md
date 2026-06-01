@@ -134,6 +134,9 @@ After any of the following, update the relevant section of `CLAUDE.md` before cl
 | POST | `/set-api-key` | Accepts `{api_key}`, sets env + persists to `.env` |
 | POST | `/build` | Accepts `{title, fields}` JSON, generates PDF without AI, returns same shape as `/upload` |
 | POST | `/build-from-layout` | Accepts uploaded PDF + visual field coordinates, injects AcroForm fields into original layout |
+| POST | `/create-sign-session` | Accepts uploaded PDF + visual field coordinates, returns a shareable web signing URL |
+| GET | `/sign/<id>` | Renders a signer page with text inputs + draw signature pads |
+| POST | `/sign/<id>/submit` | Accepts signer values/signatures, embeds them into PDF, returns download page |
 | POST | `/share` | Accepts `{title, fields}`, stores form in `data/forms.json`, returns `{form_id, share_url, field_count}` |
 | GET | `/form/<id>` | Renders customer-facing web form (`templates/form.html`) |
 | POST | `/form/<id>/submit` | Saves customer submission to `data/forms.json`, shows thank-you page |
@@ -143,12 +146,16 @@ After any of the following, update the relevant section of `CLAUDE.md` before cl
 | Type | Rendered as |
 |---|---|
 | `text` | Single-line AcroForm textfield |
+| `signature` | AcroForm signature widget (or textfield fallback if viewer/library lacks signature widget support) |
 | `textarea` | Multi-line AcroForm textfield |
 | `date` | Single-line textfield with `(MM / DD / YYYY)` hint |
 | `email` | Single-line textfield with email hint |
 | `phone` | Single-line textfield with phone hint |
 | `checkbox` | AcroForm checkbox widget |
 | `list` | Section header + 5 numbered AcroForm textfield rows |
+
+**Visual Fillable note:** Visual placement mode currently supports `text` and `signature` field types.
+Use **Create Web Sign Link** when you need DocuSign-style drawn signatures captured in-browser and embedded into the final PDF.
 
 **Note on date popup:** True calendar date-picker in PDF requires Adobe Acrobat JavaScript, which ReportLab's public canvas API does not expose. Date fields use a clearly-labelled text input as the best available cross-viewer alternative.
 

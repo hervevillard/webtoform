@@ -15,6 +15,7 @@ from modules.pdf_reader import extract_text
 from modules.deepseek_client import analyze_document
 from modules.form_generator import create_fillable_pdf
 from modules.layout_fillable import add_fillable_fields_to_existing_pdf
+from modules.signing_sessions import build_signed_pdf, create_sign_session, get_sign_session
 from modules.store import create_form, get_form, add_submission, list_forms
 
 app = Flask(__name__)
@@ -208,6 +209,104 @@ def build_from_layout():
         return jsonify({"error": f"PDF conversion failed: {str(e)}"}), 500
     finally:
         upload_path.unlink(missing_ok=True)
+
+
+@app.route("/create-sign-session", methods=["POST"])
+def create_signing_session_route():
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided."}), 400
+
+    f = request.files["file"]
+    if not f.filename or not _allowed(f.filename):
+        return jsonify({"error": "Please upload a valid PDF file."}), 400
+
+    raw_fields = request.form.get("fields", "[]")
+    title = (request.form.get("title") or "Sign Document").strip() or "Sign Document"
+    try:
+        fields = json.loads(raw_fields)
+    except json.JSONDecodeError:
+        return jsonify({"error": "Invalid field layout payload."}), 400
+
+    unique_name = f"{uuid.uuid4().hex}_{secure_filename(f.filename)}"
+    upload_path = UPLOAD_DIR / unique_name
+    f.save(str(upload_path))
+
+    try:
+        session = create_sign_session(str(upload_path), fields, title=title)
+        return jsonify(
+            {
+                "session_id": session["id"],
+                "sign_url": f"/sign/{session['id']}",
+                "field_count": len(session["fields"]),
+            }
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        app.logger.exception("Create sign session failed")
+        return jsonify({"error": f"Could not create signing session: {str(e)}"}), 500
+    finally:
+        upload_path.unlink(missing_ok=True)
+
+
+@app.route("/sign/<session_id>")
+def sign_session_page(session_id: str):
+    session = get_sign_session(session_id)
+    if not session:
+        return render_template("sign.html", session=None, error="Signing link not found or expired."), 404
+    return render_template("sign.html", session=session, error=None, submitted=False, download_url=None, prefill=None, validation_error=None)
+
+
+@app.route("/sign/<session_id>/submit", methods=["POST"])
+def sign_session_submit(session_id: str):
+    session = get_sign_session(session_id)
+    if not session:
+        return render_template("sign.html", session=None, error="Signing link not found or expired."), 404
+
+    submitted = {}
+    for field in session["fields"]:
+        submitted[field["key"]] = (request.form.get(field["key"]) or "").strip()
+
+    for field in session["fields"]:
+        if not field.get("required"):
+            continue
+        value = submitted.get(field["key"], "")
+        if not value:
+            label = field.get("label") or field.get("key")
+            return render_template(
+                "sign.html",
+                session=session,
+                error=None,
+                submitted=False,
+                download_url=None,
+                prefill=submitted,
+                validation_error=f'"{label}" is required.',
+            )
+
+    try:
+        out_filename = f"signed_{uuid.uuid4().hex[:8]}.pdf"
+        out_path = OUTPUT_DIR / out_filename
+        build_signed_pdf(session, submitted, str(out_path))
+        return render_template(
+            "sign.html",
+            session=session,
+            error=None,
+            submitted=True,
+            download_url=f"/download/{out_filename}",
+            prefill=None,
+            validation_error=None,
+        )
+    except Exception as e:
+        app.logger.exception("Sign session submit failed")
+        return render_template(
+            "sign.html",
+            session=session,
+            error=f"Could not generate signed PDF: {str(e)}",
+            submitted=False,
+            download_url=None,
+            prefill=submitted,
+            validation_error=None,
+        ), 500
 
 
 @app.route("/share", methods=["POST"])

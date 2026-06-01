@@ -3,7 +3,7 @@ import re
 import fitz
 
 
-VALID_FIELD_TYPES = {"text", "checkbox"}
+VALID_FIELD_TYPES = {"text", "checkbox", "signature"}
 
 
 def _safe_field_name(label: str, index: int) -> str:
@@ -96,6 +96,14 @@ def add_fillable_fields_to_existing_pdf(input_path: str, output_path: str, field
             if field["type"] == "checkbox":
                 widget.field_type = fitz.PDF_WIDGET_TYPE_CHECKBOX
                 widget.field_value = "Off"
+            elif field["type"] == "signature":
+                signature_type = getattr(fitz, "PDF_WIDGET_TYPE_SIGNATURE", None)
+                if signature_type is not None:
+                    widget.field_type = signature_type
+                else:
+                    widget.field_type = fitz.PDF_WIDGET_TYPE_TEXT
+                    widget.text_font = "Helv"
+                    widget.text_fontsize = 10
             else:
                 widget.field_type = fitz.PDF_WIDGET_TYPE_TEXT
                 widget.text_font = "Helv"

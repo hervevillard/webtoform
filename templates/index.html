@@ -100,7 +100,7 @@
         <input type="text" id="visual-field-label" class="builder-title-input" placeholder="Optional field label (e.g. Insured Name)" />
         <select id="visual-field-type" class="builder-type-select">
           <option value="text">text</option>
-          <option value="checkbox">checkbox</option>
+          <option value="signature">signature</option>
         </select>
         <label class="req-toggle-wrap" title="Required">
           <input type="checkbox" id="visual-field-required" />
@@ -108,7 +108,8 @@
         </label>
       </div>
 
-      <p class="card-desc" style="margin-bottom:.7rem;">Click and drag on the PDF preview to place a field, then choose its type when you release.</p>
+      <p class="card-desc" style="margin-bottom:.35rem;">Choose text or signature, then click and drag on the PDF preview to place a field.</p>
+      <p class="card-desc" style="margin-bottom:.7rem; font-size:.78rem;">Signature fields are standard PDF e-sign widgets. They work best in Adobe Acrobat Reader; browser PDF viewers often only show a basic Sign button and do not provide DocuSign-style drawing flow.</p>
       <div class="visual-canvas-wrap" id="visual-canvas-wrap">
         <canvas id="visual-pdf-canvas"></canvas>
         <div id="visual-overlay" class="visual-overlay"></div>
@@ -123,6 +124,7 @@
       <div class="builder-actions">
         <button class="btn btn-ghost" id="visual-clear-page" type="button">Clear Current Page</button>
         <button class="btn btn-ghost" id="visual-clear-all" type="button">Clear All</button>
+        <button class="btn btn-ghost" id="visual-create-sign-btn" type="button">Create Web Sign Link</button>
         <button class="btn btn-success" id="visual-generate-btn" type="button">Generate Fillable PDF</button>
       </div>
 

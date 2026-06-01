@@ -31,6 +31,7 @@
   const visualFieldCount    = document.getElementById("visual-field-count");
   const visualClearPageBtn  = document.getElementById("visual-clear-page");
   const visualClearAllBtn   = document.getElementById("visual-clear-all");
+  const visualCreateSignBtn = document.getElementById("visual-create-sign-btn");
   const visualGenerateBtn   = document.getElementById("visual-generate-btn");
   const visualStatusArea    = document.getElementById("visual-status-area");
 
@@ -55,11 +56,13 @@
     visualPageLabel.textContent = `Page ${pages ? visualPageNumber : 0} / ${pages}`;
     visualPrevPageBtn.disabled = !visualPdfDoc || visualPageNumber <= 1;
     visualNextPageBtn.disabled = !visualPdfDoc || visualPageNumber >= pages;
+    visualCreateSignBtn.disabled = !visualSelectedFile || visualFields.length === 0;
     visualGenerateBtn.disabled = !visualSelectedFile || visualFields.length === 0;
   }
 
   function updateVisualFieldState() {
     visualFieldCount.textContent = `${visualFields.length} field${visualFields.length !== 1 ? "s" : ""}`;
+    visualCreateSignBtn.disabled = !visualSelectedFile || visualFields.length === 0;
     visualGenerateBtn.disabled = !visualSelectedFile || visualFields.length === 0;
 
     visualFieldList.innerHTML = "";
@@ -154,7 +157,7 @@
     const pageFields = visualFields.filter(f => f.page === visualPageNumber);
     pageFields.forEach(field => {
       const box = document.createElement("div");
-      box.className = `visual-box ${field.type === "checkbox" ? "checkbox" : "text"}`;
+      box.className = `visual-box ${field.type === "signature" ? "signature" : "text"}`;
 
       const left = (field.x / visualPageWidthPts) * overlayWidthPx;
       const top = ((visualPageHeightPts - (field.y + field.height)) / visualPageHeightPts) * overlayHeightPx;
@@ -247,24 +250,6 @@
     };
   }
 
-  function promptVisualFieldType(defaultType) {
-    const allowedTypes = ["text", "checkbox"];
-    const fallbackType = allowedTypes.includes(defaultType) ? defaultType : "text";
-
-    while (true) {
-      const choice = window.prompt("Choose field type: text or checkbox", fallbackType);
-      if (choice === null) {
-        showStatus(visualStatusArea, "Field placement cancelled.", "error");
-        return null;
-      }
-
-      const normalized = choice.trim().toLowerCase();
-      if (allowedTypes.includes(normalized)) return normalized;
-
-      showStatus(visualStatusArea, "Use either 'text' or 'checkbox' for field type.", "error");
-    }
-  }
-
   visualOverlay.addEventListener("mousedown", (event) => {
     if (!visualPdfDoc) return;
 
@@ -306,16 +291,8 @@
     drawState.ghost.remove();
     drawState = null;
 
-    const type = promptVisualFieldType(visualFieldType.value);
-    if (!type) return;
-
-    visualFieldType.value = type;
-
-    if (type === "checkbox") {
-      const side = Math.max(12, Math.min(widthPx || 12, heightPx || 12));
-      widthPx = side;
-      heightPx = side;
-    }
+    const selectedType = visualFieldType ? visualFieldType.value : "text";
+    const type = selectedType === "signature" ? "signature" : "text";
 
     if (widthPx < 8 || heightPx < 8) return;
 
@@ -384,13 +361,59 @@
         visualGenerateBtn.disabled = false;
         return;
       }
-      showStatus(visualStatusArea, `&#10003; Done — ${data.field_count} fields added. Downloading…`, "success");
+      const hasSignature = visualFields.some(f => f.type === "signature");
+      const successMsg = hasSignature
+        ? `&#10003; Done — ${data.field_count} fields added. Downloading… Open in Adobe Acrobat Reader for full signature experience.`
+        : `&#10003; Done — ${data.field_count} fields added. Downloading…`;
+      showStatus(visualStatusArea, successMsg, "success");
       window.location.href = data.download_url;
     } catch (_) {
       showStatus(visualStatusArea, "Network error — is the server running?", "error");
     }
 
     visualGenerateBtn.disabled = false;
+  });
+
+  visualCreateSignBtn.addEventListener("click", async () => {
+    if (!visualSelectedFile) {
+      showStatus(visualStatusArea, "Please upload a PDF first.", "error");
+      return;
+    }
+    if (visualFields.length === 0) {
+      showStatus(visualStatusArea, "Draw at least one field area first.", "error");
+      return;
+    }
+
+    visualCreateSignBtn.disabled = true;
+    showSpinner(visualStatusArea, "Creating web signing link…");
+
+    const formData = new FormData();
+    formData.append("file", visualSelectedFile);
+    formData.append("fields", JSON.stringify(visualFields.map(({ id, ...f }) => f)));
+    formData.append("title", visualSelectedFile.name.replace(/\.pdf$/i, "") || "Sign Document");
+
+    try {
+      const res = await fetch("/create-sign-session", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        showStatus(visualStatusArea, data.error || "Could not create signing link.", "error");
+        visualCreateSignBtn.disabled = false;
+        return;
+      }
+
+      const signUrl = data.sign_url;
+      const absoluteUrl = new URL(signUrl, window.location.origin).toString();
+      showStatus(
+        visualStatusArea,
+        `&#10003; Signing link ready: <a href="${escHtml(absoluteUrl)}" target="_blank" rel="noopener">${escHtml(absoluteUrl)}</a>`,
+        "success"
+      );
+      window.open(signUrl, "_blank", "noopener");
+    } catch (_) {
+      showStatus(visualStatusArea, "Network error — is the server running?", "error");
+    }
+
+    visualCreateSignBtn.disabled = false;
   });
 
   updateVisualFieldState();

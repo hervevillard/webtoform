@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% if session %}{{ session.title }}{% else %}Sign Document{% endif %} - WebToForm</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    body {
+      background: var(--bg);
+      min-height: 100vh;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 2rem 1rem 3rem;
+    }
+
+    .sign-card {
+      width: 100%;
+      max-width: 760px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-card);
+      overflow: hidden;
+    }
+
+    .sign-header {
+      background: var(--midnight);
+      color: var(--gold-light);
+      padding: 1.2rem 1.4rem;
+    }
+
+    .sign-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+    }
+
+    .sign-sub {
+      margin-top: .35rem;
+      font-size: .82rem;
+      color: var(--sand);
+    }
+
+    .sign-body {
+      padding: 1.2rem 1.4rem 1.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .sign-error {
+      border: 1px solid #f5b8b0;
+      background: #fef0ee;
+      color: var(--red);
+      border-radius: var(--radius-sm);
+      padding: .6rem .8rem;
+      font-size: .88rem;
+      font-weight: 600;
+    }
+
+    .sign-success {
+      border: 1px solid #bde5c8;
+      background: #ebfaef;
+      color: var(--forest);
+      border-radius: var(--radius-sm);
+      padding: .8rem .9rem;
+      font-size: .9rem;
+      font-weight: 700;
+    }
+
+    .sign-field {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--ivory-dark);
+      padding: .75rem .8rem;
+    }
+
+    .sign-label {
+      display: block;
+      font-size: .78rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      margin-bottom: .45rem;
+    }
+
+    .sign-required {
+      color: var(--red);
+      margin-left: 2px;
+    }
+
+    .sign-input {
+      width: 100%;
+      padding: .6rem .75rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font: inherit;
+      color: var(--text-primary);
+      outline: none;
+    }
+
+    .sign-input:focus {
+      border-color: var(--gold);
+      box-shadow: 0 0 0 3px rgba(201,168,76,.18);
+    }
+
+    .sig-pad-wrap {
+      border: 1px dashed var(--earth-light);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      position: relative;
+    }
+
+    .sig-pad {
+      display: block;
+      width: 100%;
+      height: 170px;
+      touch-action: none;
+      cursor: crosshair;
+      border-radius: var(--radius-sm);
+    }
+
+    .sig-actions {
+      margin-top: .45rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: .6rem;
+    }
+
+    .sig-help {
+      font-size: .76rem;
+      color: var(--text-muted);
+    }
+
+    .sig-clear {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: #fff;
+      color: var(--text-secondary);
+      font: inherit;
+      font-size: .78rem;
+      padding: .3rem .65rem;
+      cursor: pointer;
+    }
+
+    .sign-submit {
+      margin-top: .2rem;
+      padding: .85rem;
+      border: none;
+      border-radius: var(--radius-sm);
+      font: inherit;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(135deg, var(--forest), var(--forest-light));
+      cursor: pointer;
+    }
+
+    .sign-submit:hover {
+      transform: translateY(-1px);
+    }
+
+    @media (max-width: 560px) {
+      .sign-body,
+      .sign-header {
+        padding-left: 1rem;
+        padding-right: 1rem;
+      }
+
+      .sig-pad {
+        height: 150px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sign-card">
+    <div class="sign-header">
+      <div class="sign-title">{% if session %}{{ session.title }}{% else %}Sign Document{% endif %}</div>
+      <div class="sign-sub">Complete the fields below. Use your mouse or finger to draw each signature.</div>
+    </div>
+
+    <div class="sign-body">
+      {% if error and not session %}
+      <div class="sign-error">{{ error }}</div>
+      {% elif submitted %}
+      <div class="sign-success">
+        Done. Your signed PDF is ready.
+        {% if download_url %}
+        <div style="margin-top:.45rem;">
+          <a href="{{ download_url }}" class="btn btn-success">Download Signed PDF</a>
+        </div>
+        {% endif %}
+      </div>
+      {% else %}
+      {% if error %}
+      <div class="sign-error">{{ error }}</div>
+      {% endif %}
+      {% if validation_error %}
+      <div class="sign-error">{{ validation_error }}</div>
+      {% endif %}
+
+      <form method="POST" action="/sign/{{ session.id }}/submit" id="sign-form" novalidate>
+        {% for field in session.fields %}
+          {% set label = field.label or ("Signature" if field.type == "signature" else "Field " ~ loop.index) %}
+          {% set value = (prefill or {}).get(field.key, "") %}
+
+          <div class="sign-field">
+            <label class="sign-label" for="{{ field.key }}">
+              {{ label }}
+              {% if field.required %}<span class="sign-required">*</span>{% endif %}
+            </label>
+
+            {% if field.type == "signature" %}
+              <input type="hidden" name="{{ field.key }}" id="{{ field.key }}" value="{{ value }}" />
+              <div class="sig-pad-wrap">
+                <canvas class="sig-pad" data-target="{{ field.key }}" data-required="{{ '1' if field.required else '0' }}"></canvas>
+              </div>
+              <div class="sig-actions">
+                <span class="sig-help">Draw signature in the box.</span>
+                <button type="button" class="sig-clear" data-clear="{{ field.key }}">Clear</button>
+              </div>
+            {% else %}
+              <input
+                class="sign-input"
+                type="text"
+                id="{{ field.key }}"
+                name="{{ field.key }}"
+                value="{{ value }}"
+                {% if field.required %}required{% endif %}
+              />
+            {% endif %}
+          </div>
+        {% endfor %}
+
+        <button class="sign-submit" type="submit">Generate Signed PDF</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if session and not submitted %}
+  <script>
+    (function () {
+      function setupPad(canvas) {
+        const targetId = canvas.dataset.target;
+        const hidden = document.getElementById(targetId);
+        if (!hidden) return;
+
+        const ctx = canvas.getContext("2d");
+        let drawing = false;
+        let dirty = false;
+
+        function resize() {
+          const ratio = Math.max(window.devicePixelRatio || 1, 1);
+          const rect = canvas.getBoundingClientRect();
+          const nextW = Math.max(1, Math.floor(rect.width * ratio));
+          const nextH = Math.max(1, Math.floor(rect.height * ratio));
+          if (canvas.width === nextW && canvas.height === nextH) return;
+          canvas.width = nextW;
+          canvas.height = nextH;
+          ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+          ctx.lineWidth = 2;
+          ctx.lineCap = "round";
+          ctx.lineJoin = "round";
+          ctx.strokeStyle = "#1C1C2E";
+          if (hidden.value) {
+            const img = new Image();
+            img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+            img.src = hidden.value;
+          }
+        }
+
+        function point(evt) {
+          const rect = canvas.getBoundingClientRect();
+          const src = evt.touches ? evt.touches[0] : evt;
+          return {
+            x: src.clientX - rect.left,
+            y: src.clientY - rect.top,
+          };
+        }
+
+        function start(evt) {
+          evt.preventDefault();
+          drawing = true;
+          const p = point(evt);
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+        }
+
+        function move(evt) {
+          if (!drawing) return;
+          evt.preventDefault();
+          const p = point(evt);
+          ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+          dirty = true;
+        }
+
+        function end() {
+          if (!drawing) return;
+          drawing = false;
+          if (!dirty) return;
+          hidden.value = canvas.toDataURL("image/png");
+        }
+
+        canvas.addEventListener("mousedown", start);
+        canvas.addEventListener("mousemove", move);
+        window.addEventListener("mouseup", end);
+        canvas.addEventListener("touchstart", start, { passive: false });
+        canvas.addEventListener("touchmove", move, { passive: false });
+        canvas.addEventListener("touchend", end);
+
+        const clearBtn = document.querySelector('[data-clear="' + targetId + '"]');
+        if (clearBtn) {
+          clearBtn.addEventListener("click", () => {
+            const rect = canvas.getBoundingClientRect();
+            ctx.clearRect(0, 0, rect.width, rect.height);
+            hidden.value = "";
+            dirty = false;
+          });
+        }
+
+        resize();
+        window.addEventListener("resize", resize);
+      }
+
+      document.querySelectorAll(".sig-pad").forEach(setupPad);
+
+      document.getElementById("sign-form")?.addEventListener("submit", (evt) => {
+        const missing = [];
+        document.querySelectorAll(".sig-pad").forEach((canvas) => {
+          if (canvas.dataset.required !== "1") return;
+          const key = canvas.dataset.target;
+          const hidden = document.getElementById(key);
+          if (!hidden || !hidden.value) {
+            missing.push(key);
+          }
+        });
+
+        if (missing.length > 0) {
+          evt.preventDefault();
+          alert("Please draw all required signatures before submitting.");
+        }
+      });
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>
